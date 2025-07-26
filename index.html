@@ -325,8 +325,13 @@
                 <h2>📊 Import Player Data</h2>
                 <div class="form-group">
                     <label for="csvFile">Upload CSV File (Google Sheets Export)</label>
-                    <input type="file" id="csvFile" accept=".csv" style="width: 100%; padding: 12px; border: 2px solid #3498db; border-radius: 8px; background: #f8f9fa;" />
+                    <input type="file" id="csvFile" accept=".csv,.txt,text/csv,application/csv,text/plain" style="width: 100%; padding: 12px; border: 2px solid #3498db; border-radius: 8px; background: #f8f9fa;" />
                     <div id="fileStatus" style="margin-top: 8px; font-size: 14px; color: #666;"></div>
+                    <div style="margin-top: 10px;">
+                        <button type="button" class="btn" onclick="removeFileRestrictions()" style="font-size: 14px; padding: 8px 16px;">
+                            Can't select file? Click here to remove restrictions
+                        </button>
+                    </div>
                 </div>
                 <button class="btn" onclick="loadSampleData()">Load Sample Data</button>
                 <button class="btn btn-success" onclick="importData()">Import Data</button>
@@ -714,6 +719,12 @@
             updateDivisionSelect();
         }
 
+        function removeFileRestrictions() {
+            const fileInput = document.getElementById('csvFile');
+            fileInput.removeAttribute('accept');
+            showAlert('File restrictions removed. You can now select any file type.', 'info');
+        }
+
         function importData() {
             const fileInput = document.getElementById('csvFile');
             const file = fileInput.files[0];
@@ -727,52 +738,83 @@
             reader.onload = function(e) {
                 try {
                     const csv = e.target.result;
+                    
+                    // Log first few lines for debugging
+                    console.log('First 500 characters of CSV:');
+                    console.log(csv.substring(0, 500));
+                    
                     const lines = csv.split('\n');
-                    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+                    
+                    // Clean up the header line and parse it
+                    const headerLine = lines[0].replace(/\r/g, '');
+                    const headers = parseCSVLine(headerLine);
+                    
+                    console.log('Parsed headers:', headers);
                     
                     playersData = [];
+                    let successCount = 0;
+                    let errorCount = 0;
                     
                     for (let i = 1; i < lines.length; i++) {
-                        if (lines[i].trim() === '') continue;
+                        const line = lines[i].replace(/\r/g, '').trim();
+                        if (line === '') continue;
                         
-                        const values = parseCSVLine(lines[i]);
-                        const player = {};
-                        
-                        headers.forEach((header, index) => {
-                            player[header] = values[index] || '';
-                        });
-                        
-                        // Clean and structure the data
-                        const cleanPlayer = {
-                            firstName: player['First Name']?.trim() || '',
-                            lastName: player['Last Name']?.trim() || '',
-                            fullName: `${player['First Name']?.trim() || ''} ${player['Last Name']?.trim() || ''}`.trim(),
-                            experience: player['Experience'] || 'Average',
-                            boardExperience: player['Board Experience'] || null,
-                            position: player['Position'] || 'Any Position',
-                            missedGames: player['Missed Games'] || 'None',
-                            isTeamRep: (player['TR'] || '').toLowerCase() === 'yes',
-                            openDivisionRequests: parseRequests(player['(Open Division) Requests']),
-                            o30o40Requests: parseRequests(player['(O30 or O40) Requests']),
-                            divisions: [
-                                player['Divisions'],
-                                player['Divisions2'],
-                                player['Divisions3']
-                            ].filter(d => d && d.trim() !== ''),
-                            numberOfDivisions: parseInt(player['Number of Divisions']) || 1
-                        };
-                        
-                        if (cleanPlayer.firstName && cleanPlayer.lastName) {
-                            playersData.push(cleanPlayer);
+                        try {
+                            const values = parseCSVLine(line);
+                            const player = {};
+                            
+                            // Map values to headers
+                            headers.forEach((header, index) => {
+                                player[header] = values[index] || '';
+                            });
+                            
+                            // Clean and structure the data
+                            const cleanPlayer = {
+                                firstName: (player['First Name'] || '').trim(),
+                                lastName: (player['Last Name'] || '').trim(),
+                                fullName: `${(player['First Name'] || '').trim()} ${(player['Last Name'] || '').trim()}`.trim(),
+                                experience: player['Experience'] || 'Average',
+                                boardExperience: player['Board Experience'] || null,
+                                position: player['Position'] || 'Any Position',
+                                missedGames: player['Missed Games'] || 'None',
+                                isTeamRep: (player['TR'] || '').toLowerCase() === 'yes',
+                                openDivisionRequests: parseRequests(player['(Open Division) Requests']),
+                                o30o40Requests: parseRequests(player['(O30 or O40) Requests']),
+                                divisions: [
+                                    player['Divisions'],
+                                    player['Divisions2'], 
+                                    player['Divisions3']
+                                ].filter(d => d && d.trim() !== ''),
+                                numberOfDivisions: parseInt(player['Number of Divisions']) || 1
+                            };
+                            
+                            // Only add if we have basic required info
+                            if (cleanPlayer.firstName && cleanPlayer.lastName) {
+                                playersData.push(cleanPlayer);
+                                successCount++;
+                            } else {
+                                console.log('Skipped incomplete player:', cleanPlayer);
+                                errorCount++;
+                            }
+                        } catch (lineError) {
+                            console.error(`Error parsing line ${i}:`, lineError, line);
+                            errorCount++;
                         }
                     }
                     
-                    showAlert(`Successfully imported ${playersData.length} players!`, 'success');
-                    updateDivisionSelect();
+                    if (successCount > 0) {
+                        showAlert(`Successfully imported ${successCount} players! ${errorCount > 0 ? `(${errorCount} rows skipped)` : ''}`, 'success');
+                        updateDivisionSelect();
+                        
+                        // Show first few players for verification
+                        console.log('First 3 imported players:', playersData.slice(0, 3));
+                    } else {
+                        showAlert('No valid player data found. Please check your CSV format.', 'error');
+                    }
                     
                 } catch (error) {
-                    showAlert('Error parsing CSV file. Please check the format.', 'error');
                     console.error('CSV parsing error:', error);
+                    showAlert('Error parsing CSV file. Please check the format and try again.', 'error');
                 }
             };
             
@@ -783,22 +825,42 @@
             const values = [];
             let current = '';
             let inQuotes = false;
+            let i = 0;
             
-            for (let i = 0; i < line.length; i++) {
+            while (i < line.length) {
                 const char = line[i];
                 
                 if (char === '"') {
-                    inQuotes = !inQuotes;
+                    if (inQuotes && i + 1 < line.length && line[i + 1] === '"') {
+                        // Handle escaped quote (double quotes)
+                        current += '"';
+                        i += 2;
+                        continue;
+                    } else {
+                        // Toggle quote state
+                        inQuotes = !inQuotes;
+                    }
                 } else if (char === ',' && !inQuotes) {
+                    // End of field
                     values.push(current.trim());
                     current = '';
                 } else {
                     current += char;
                 }
+                i++;
             }
             
+            // Don't forget the last field
             values.push(current.trim());
-            return values;
+            
+            // Clean up any remaining quotes
+            return values.map(value => {
+                // Remove surrounding quotes if they exist
+                if (value.startsWith('"') && value.endsWith('"')) {
+                    return value.slice(1, -1);
+                }
+                return value;
+            });
         }
         
         function parseRequests(requestStr) {
