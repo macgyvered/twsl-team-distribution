@@ -412,7 +412,18 @@
             }
 
             playerInDivision(player, division) {
-                return player.divisions.some(d => d.includes(division) || division.includes(d));
+                // Check if player is registered for the specific division
+                return player.divisions.some(divisionString => {
+                    if (!divisionString) return false;
+                    
+                    // Split by comma in case multiple divisions are listed together
+                    const individualDivisions = divisionString.split(',').map(d => d.trim());
+                    return individualDivisions.some(d => 
+                        d === division || 
+                        d.includes(division) || 
+                        division.includes(d)
+                    );
+                });
             }
 
             // Convert experience to numeric value
@@ -644,8 +655,8 @@
                 {
                     firstName: 'Sarah', lastName: 'Johnson', fullName: 'Sarah Johnson',
                     experience: 'Advanced', boardExperience: null, position: 'Offense', 
-                    missedGames: 'One', isTeamRep: false, divisions: ['Open Division (+18)'],
-                    openDivisionRequests: ['Emma', 'Lisa'], o30o40Requests: []
+                    missedGames: 'One', isTeamRep: false, divisions: ['Open Division (+18)', 'Over 30 Division'],
+                    openDivisionRequests: ['Emma', 'Lisa'], o30o40Requests: ['Ashley']
                 },
                 {
                     firstName: 'Emma', lastName: 'Davis', fullName: 'Emma Davis',
@@ -712,10 +723,22 @@
                     experience: 'Advanced', boardExperience: null, position: 'Anywhere Except Goalie', 
                     missedGames: 'One', isTeamRep: false, divisions: ['Over 30 Division'],
                     openDivisionRequests: [], o30o40Requests: ['Kristen']
+                },
+                {
+                    firstName: 'Rachel', lastName: 'Martinez', fullName: 'Rachel Martinez',
+                    experience: 'Average', boardExperience: null, position: 'Defense', 
+                    missedGames: 'None', isTeamRep: false, divisions: ['Over 40 Division (Low Impact)'],
+                    openDivisionRequests: [], o30o40Requests: []
+                },
+                {
+                    firstName: 'Katie', lastName: 'Lee', fullName: 'Katie Lee',
+                    experience: 'Beginner', boardExperience: null, position: 'Any Position', 
+                    missedGames: 'Two', isTeamRep: false, divisions: ['Over 40 Division (Low Impact)'],
+                    openDivisionRequests: [], o30o40Requests: []
                 }
             ];
             
-            showAlert('Sample data loaded successfully! 16 players ready for team distribution.', 'success');
+            showAlert('Sample data loaded! 18 players across 3 divisions. Sarah Johnson is registered for both Open and Over 30.', 'success');
             updateDivisionSelect();
         }
 
@@ -784,7 +807,7 @@
                                     player['Divisions'],
                                     player['Divisions2'], 
                                     player['Divisions3']
-                                ].filter(d => d && d.trim() !== ''),
+                                ].filter(d => d && d.trim() !== '').map(d => d.trim()),
                                 numberOfDivisions: parseInt(player['Number of Divisions']) || 1
                             };
                             
@@ -875,12 +898,23 @@
             select.innerHTML = '<option value="">Select division...</option>';
             
             const divisions = new Set();
+            
+            // Extract individual divisions from all players
             playersData.forEach(player => {
-                player.divisions.forEach(division => {
-                    if (division) divisions.add(division);
+                player.divisions.forEach(divisionString => {
+                    if (divisionString && divisionString.trim()) {
+                        // Split by comma in case multiple divisions are listed together
+                        const individualDivisions = divisionString.split(',').map(d => d.trim());
+                        individualDivisions.forEach(division => {
+                            if (division) {
+                                divisions.add(division);
+                            }
+                        });
+                    }
                 });
             });
             
+            // Sort divisions alphabetically and add to dropdown
             Array.from(divisions).sort().forEach(division => {
                 const option = document.createElement('option');
                 option.value = division;
