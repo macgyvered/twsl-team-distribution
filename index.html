@@ -325,12 +325,8 @@
                 <h2>📊 Import Player Data</h2>
                 <div class="form-group">
                     <label for="csvFile">Upload CSV File (Google Sheets Export)</label>
-                    <div class="file-input-wrapper">
-                        <input type="file" id="csvFile" accept=".csv" />
-                        <label for="csvFile" class="file-input-display">
-                            Click to select CSV file or drag and drop here
-                        </label>
-                    </div>
+                    <input type="file" id="csvFile" accept=".csv" style="width: 100%; padding: 12px; border: 2px solid #3498db; border-radius: 8px; background: #f8f9fa;" />
+                    <div id="fileStatus" style="margin-top: 8px; font-size: 14px; color: #666;"></div>
                 </div>
                 <button class="btn" onclick="loadSampleData()">Load Sample Data</button>
                 <button class="btn btn-success" onclick="importData()">Import Data</button>
@@ -614,21 +610,107 @@
 
         // UI Functions
         function loadSampleData() {
-            // This would load the sample CSV data
-            document.getElementById('csvFile').style.display = 'none';
-            showAlert('Sample data loaded successfully!', 'success');
-            
-            // Mock sample data for demonstration
+            // Load realistic sample data based on your CSV structure
             playersData = [
                 {
                     firstName: 'Ashley', lastName: 'Parker', fullName: 'Ashley Parker',
-                    experience: 'Average', position: 'Defense', missedGames: 'Two',
-                    isTeamRep: false, divisions: ['Over 30 Division'],
+                    experience: 'Average', boardExperience: null, position: 'Defense', 
+                    missedGames: 'Two', isTeamRep: false, divisions: ['Over 30 Division'],
                     openDivisionRequests: [], o30o40Requests: ['Becky', 'Sharon']
                 },
-                // Add more sample players...
+                {
+                    firstName: 'Courtney', lastName: 'Williams', fullName: 'Courtney Williams',
+                    experience: 'Average', boardExperience: null, position: 'Keeper/Goalie', 
+                    missedGames: 'Three', isTeamRep: false, divisions: ['Open Division (+18)'],
+                    openDivisionRequests: ['Jordan', 'Christina', 'Obi', 'Alexis'], o30o40Requests: []
+                },
+                {
+                    firstName: 'Kristen', lastName: 'Moore', fullName: 'Kristen Moore',
+                    experience: 'Average', boardExperience: null, position: 'Anywhere Except Goalie', 
+                    missedGames: 'None', isTeamRep: false, divisions: ['Over 30 Division'],
+                    openDivisionRequests: [], o30o40Requests: ['Laura', 'Monica']
+                },
+                {
+                    firstName: 'Megan', lastName: 'Canalichio', fullName: 'Megan Canalichio',
+                    experience: 'Average', boardExperience: null, position: 'Defense', 
+                    missedGames: 'None', isTeamRep: true, divisions: ['Open Division (+18)'],
+                    openDivisionRequests: [], o30o40Requests: []
+                },
+                {
+                    firstName: 'Sarah', lastName: 'Johnson', fullName: 'Sarah Johnson',
+                    experience: 'Advanced', boardExperience: null, position: 'Offense', 
+                    missedGames: 'One', isTeamRep: false, divisions: ['Open Division (+18)'],
+                    openDivisionRequests: ['Emma', 'Lisa'], o30o40Requests: []
+                },
+                {
+                    firstName: 'Emma', lastName: 'Davis', fullName: 'Emma Davis',
+                    experience: 'Beginner', boardExperience: null, position: 'Any Position', 
+                    missedGames: 'Two', isTeamRep: false, divisions: ['Open Division (+18)'],
+                    openDivisionRequests: ['Sarah'], o30o40Requests: []
+                },
+                {
+                    firstName: 'Lisa', lastName: 'Wilson', fullName: 'Lisa Wilson',
+                    experience: 'Average', boardExperience: null, position: 'Offense', 
+                    missedGames: 'None', isTeamRep: true, divisions: ['Open Division (+18)'],
+                    openDivisionRequests: ['Sarah'], o30o40Requests: []
+                },
+                {
+                    firstName: 'Maria', lastName: 'Garcia', fullName: 'Maria Garcia',
+                    experience: 'Advanced', boardExperience: null, position: 'Keeper/Goalie', 
+                    missedGames: 'One', isTeamRep: false, divisions: ['Over 30 Division'],
+                    openDivisionRequests: [], o30o40Requests: []
+                },
+                {
+                    firstName: 'Jennifer', lastName: 'Brown', fullName: 'Jennifer Brown',
+                    experience: 'Average', boardExperience: null, position: 'Defense', 
+                    missedGames: 'Three', isTeamRep: false, divisions: ['Over 30 Division'],
+                    openDivisionRequests: [], o30o40Requests: ['Ashley']
+                },
+                {
+                    firstName: 'Rebecca', lastName: 'Taylor', fullName: 'Rebecca Taylor',
+                    experience: 'Beginner', boardExperience: null, position: 'Anywhere Except Goalie', 
+                    missedGames: 'Two', isTeamRep: false, divisions: ['Over 30 Division'],
+                    openDivisionRequests: [], o30o40Requests: []
+                },
+                {
+                    firstName: 'Amanda', lastName: 'Miller', fullName: 'Amanda Miller',
+                    experience: 'Average', boardExperience: null, position: 'Offense', 
+                    missedGames: 'None', isTeamRep: false, divisions: ['Open Division (+18)'],
+                    openDivisionRequests: [], o30o40Requests: []
+                },
+                {
+                    firstName: 'Christina', lastName: 'Anderson', fullName: 'Christina Anderson',
+                    experience: 'Advanced', boardExperience: null, position: 'Offense', 
+                    missedGames: 'One', isTeamRep: false, divisions: ['Open Division (+18)'],
+                    openDivisionRequests: ['Courtney'], o30o40Requests: []
+                },
+                {
+                    firstName: 'Stephanie', lastName: 'Thomas', fullName: 'Stephanie Thomas',
+                    experience: 'Average', boardExperience: null, position: 'Defense', 
+                    missedGames: 'Two', isTeamRep: true, divisions: ['Over 30 Division'],
+                    openDivisionRequests: [], o30o40Requests: []
+                },
+                {
+                    firstName: 'Michelle', lastName: 'Jackson', fullName: 'Michelle Jackson',
+                    experience: 'Beginner', boardExperience: null, position: 'Any Position', 
+                    missedGames: 'None', isTeamRep: false, divisions: ['Over 30 Division'],
+                    openDivisionRequests: [], o30o40Requests: []
+                },
+                {
+                    firstName: 'Jessica', lastName: 'White', fullName: 'Jessica White',
+                    experience: 'Average', boardExperience: null, position: 'Offense', 
+                    missedGames: 'Four+', isTeamRep: false, divisions: ['Open Division (+18)'],
+                    openDivisionRequests: [], o30o40Requests: []
+                },
+                {
+                    firstName: 'Laura', lastName: 'Harris', fullName: 'Laura Harris',
+                    experience: 'Advanced', boardExperience: null, position: 'Anywhere Except Goalie', 
+                    missedGames: 'One', isTeamRep: false, divisions: ['Over 30 Division'],
+                    openDivisionRequests: [], o30o40Requests: ['Kristen']
+                }
             ];
             
+            showAlert('Sample data loaded successfully! 16 players ready for team distribution.', 'success');
             updateDivisionSelect();
         }
 
@@ -1031,9 +1113,16 @@
 
         // File input display update
         document.getElementById('csvFile').addEventListener('change', function(e) {
-            const fileName = e.target.files[0]?.name || 'No file selected';
-            const display = document.querySelector('.file-input-display');
-            display.textContent = fileName;
+            const file = e.target.files[0];
+            const statusDiv = document.getElementById('fileStatus');
+            
+            if (file) {
+                statusDiv.textContent = `Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                statusDiv.style.color = '#27ae60';
+            } else {
+                statusDiv.textContent = 'No file selected';
+                statusDiv.style.color = '#666';
+            }
         });
 
         // Initialize
