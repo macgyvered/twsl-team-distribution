@@ -512,13 +512,88 @@
                 remainingPlayers = remainingPlayers.filter(p => p.name !== tr.name);
             });
 
-            // Priority 5: Handle one-way requests
+            // Priority 5: Handle one-way requests with fair group formation
             const playersWithRequests = remainingPlayers.filter(p => p.requests.length > 0);
-            playersWithRequests.forEach(player => {
-                const teamIndex = findTeamForRequest(teams, player);
+            const processedPlayers = new Set();
+            const groups = [];
+            
+            // Step 1: Prioritize players with single requests first
+            const singleRequestPlayers = playersWithRequests.filter(p => p.requests.length === 1);
+            const multiRequestPlayers = playersWithRequests.filter(p => p.requests.length > 1);
+            
+            // Process single requests first to ensure they get honored
+            singleRequestPlayers.forEach(player => {
+                if (processedPlayers.has(player.name)) return;
+                
+                const requestedName = player.requests[0];
+                const requestedPlayer = remainingPlayers.find(p => 
+                    !processedPlayers.has(p.name) && matchesName(p.name, requestedName)
+                );
+                
+                if (requestedPlayer) {
+                    const group = [player, requestedPlayer];
+                    groups.push(group);
+                    processedPlayers.add(player.name);
+                    processedPlayers.add(requestedPlayer.name);
+                }
+            });
+            
+            // Step 2: Handle multi-request players fairly
+            multiRequestPlayers.forEach(player => {
+                if (processedPlayers.has(player.name)) return;
+                
+                const group = [player];
+                processedPlayers.add(player.name);
+                
+                // Try to add requested players (up to 3 more for max group of 4)
+                for (const requestName of player.requests) {
+                    if (group.length >= 4) break; // Max group size of 4
+                    
+                    const requestedPlayer = remainingPlayers.find(p => 
+                        !processedPlayers.has(p.name) && matchesName(p.name, requestName)
+                    );
+                    
+                    if (requestedPlayer) {
+                        group.push(requestedPlayer);
+                        processedPlayers.add(requestedPlayer.name);
+                    }
+                }
+                
+                if (group.length > 1) {
+                    groups.push(group);
+                }
+            });
+            
+            // Step 3: Place groups on teams
+            groups.forEach(group => {
+                const teamIndex = findTeamForGroup(teams, group);
                 if (teamIndex !== -1) {
-                    addPlayerToTeam(teams[teamIndex], player);
-                    remainingPlayers = remainingPlayers.filter(p => p.name !== player.name);
+                    // Place entire group together
+                    group.forEach(groupPlayer => {
+                        addPlayerToTeam(teams[teamIndex], groupPlayer);
+                        remainingPlayers = remainingPlayers.filter(p => p.name !== groupPlayer.name);
+                    });
+                } else {
+                    // Group doesn't fit anywhere, try to split fairly
+                    const splitGroups = splitGroupFairly(group);
+                    splitGroups.forEach(subGroup => {
+                        const subTeamIndex = findTeamForGroup(teams, subGroup);
+                        if (subTeamIndex !== -1) {
+                            subGroup.forEach(groupPlayer => {
+                                addPlayerToTeam(teams[subTeamIndex], groupPlayer);
+                                remainingPlayers = remainingPlayers.filter(p => p.name !== groupPlayer.name);
+                            });
+                        } else {
+                            // Place individually if even subgroups don't fit
+                            subGroup.forEach(groupPlayer => {
+                                const individualTeamIndex = findSmallestTeam(teams);
+                                if (individualTeamIndex !== -1) {
+                                    addPlayerToTeam(teams[individualTeamIndex], groupPlayer);
+                                    remainingPlayers = remainingPlayers.filter(p => p.name !== groupPlayer.name);
+                                }
+                            });
+                        }
+                    });
                 }
             });
 
@@ -605,6 +680,34 @@
             // Sort by current size (smallest first)
             availableTeams.sort((a, b) => a.players.length - b.players.length);
             return teams.indexOf(availableTeams[0]);
+        }
+
+        function splitGroupFairly(group) {
+            // If group is 4 or less, no need to split
+            if (group.length <= 4) {
+                return [group];
+            }
+            
+            // For groups of 5+, try to split as evenly as possible
+            // Aim for groups of 2-3 players each
+            const subGroups = [];
+            const halfSize = Math.ceil(group.length / 2);
+            
+            subGroups.push(group.slice(0, halfSize));
+            subGroups.push(group.slice(halfSize));
+            
+            return subGroups;
+        }
+
+        function findTeamForGroup(teams, group) {
+            // Find a team that can fit the entire group
+            for (let i = 0; i < teams.length; i++) {
+                const team = teams[i];
+                if (team.players.length + group.length <= team.targetSize) {
+                    return i;
+                }
+            }
+            return -1; // No team can fit the entire group
         }
 
         function findTeamForRequest(teams, player) {
