@@ -412,28 +412,17 @@
 
             playerInDivision(player, division) {
                 // Check if player is registered for the specific division
-                return player.divisions.some(divisionString => {
-                    if (!divisionString) return false;
-                    
-                    // Split by comma in case multiple divisions are listed together
-                    const individualDivisions = divisionString.split(',').map(d => d.trim());
-                    return individualDivisions.some(d => 
-                        d === division || 
-                        d.includes(division) || 
-                        division.includes(d)
-                    );
-                });
+                return player.divisions.includes(division);
             }
 
-            // Convert experience to numeric value
+            // Convert experience to numeric value (only use board experience)
             experienceToNumber(experience, boardExperience) {
-                const exp = boardExperience || experience;
-                switch (exp?.toLowerCase()) {
-                    case 'beginner': return 1;
-                    case 'average': return 2;
-                    case 'advanced': case 'college competitive': return 3;
-                    default: return 2;
-                }
+                // Always use board experience, ignore self-reported
+                const exp = boardExperience;
+                if (exp === 1) return 1; // Beginner
+                if (exp === 2) return 2; // Average  
+                if (exp === 3) return 3; // Advanced
+                return 2; // Default to average if unclear
             }
 
             // Convert missed games to numeric value
@@ -647,8 +636,13 @@
             }
             
             getPlayerRequests(player) {
-                return this.division.includes('Open') ? 
-                    player.openDivisionRequests : player.o30o40Requests;
+                // Use appropriate request column based on division
+                if (this.division === 'Open Division') {
+                    return player.openDivisionRequests;
+                } else if (this.division === 'Over 30 Division' || this.division === 'Over 40 Division') {
+                    return player.o30o40Requests;
+                }
+                return [];
             }
             
             namesMatch(fullName, requestName) {
@@ -694,14 +688,14 @@
                     team.stats.goalies = players.filter(p => p.position === 'Keeper/Goalie').length;
                     team.stats.teamReps = players.filter(p => p.isTeamRep).length;
                     
-                    const totalExp = players.reduce((sum, p) => 
-                        sum + this.experienceToNumber(p.experience, p.boardExperience), 0);
+                    const totalExp = players.reduce((sum, p) => sum + p.boardExperience, 0);
                     team.stats.avgExperience = players.length > 0 ? (totalExp / players.length).toFixed(1) : 0;
                     
                     team.stats.totalMissedGames = players.reduce((sum, p) => 
                         sum + this.missedGamesToNumber(p.missedGames), 0);
                     
                     // Position counts
+                    team.stats.positions = { offense: 0, defense: 0, anywhere: 0, goalie: 0 };
                     players.forEach(p => {
                         if (p.position.includes('Offense')) team.stats.positions.offense++;
                         else if (p.position.includes('Defense')) team.stats.positions.defense++;
@@ -869,6 +863,7 @@
                     playersData = [];
                     let successCount = 0;
                     let errorCount = 0;
+                    let guestPlayerCount = 0;
                     
                     for (let i = 1; i < lines.length; i++) {
                         const line = lines[i].replace(/\r/g, '').trim();
@@ -883,24 +878,43 @@
                                 player[header] = values[index] || '';
                             });
                             
+                            // Skip guest players
+                            if (player['Guest Player Divisions'] && player['Guest Player Divisions'].trim() !== '') {
+                                guestPlayerCount++;
+                                continue;
+                            }
+                            
+                            // Determine which divisions this player is in
+                            const divisions = [];
+                            if (player['Open Division'] && player['Open Division'].trim() !== '') {
+                                divisions.push('Open Division');
+                            }
+                            if (player['Over 30 Division'] && player['Over 30 Division'].trim() !== '') {
+                                divisions.push('Over 30 Division');
+                            }
+                            if (player['Over 40 Division'] && player['Over 40 Division'].trim() !== '') {
+                                divisions.push('Over 40 Division');
+                            }
+                            
+                            // Skip players not in any division
+                            if (divisions.length === 0) {
+                                continue;
+                            }
+                            
                             // Clean and structure the data
                             const cleanPlayer = {
                                 firstName: (player['First Name'] || '').trim(),
                                 lastName: (player['Last Name'] || '').trim(),
                                 fullName: `${(player['First Name'] || '').trim()} ${(player['Last Name'] || '').trim()}`.trim(),
-                                experience: player['Experience'] || 'Average',
-                                boardExperience: player['Board Experience'] || null,
+                                experience: null, // Ignore self-reported experience
+                                boardExperience: parseInt(player['Board Assigned Experience (1-3)']) || 2,
                                 position: player['Position'] || 'Any Position',
                                 missedGames: player['Missed Games'] || 'None',
                                 isTeamRep: (player['TR'] || '').toLowerCase() === 'yes',
                                 openDivisionRequests: parseRequests(player['(Open Division) Requests']),
                                 o30o40Requests: parseRequests(player['(O30 or O40) Requests']),
-                                divisions: [
-                                    player['Divisions'],
-                                    player['Divisions2'], 
-                                    player['Divisions3']
-                                ].filter(d => d && d.trim() !== '').map(d => d.trim()),
-                                numberOfDivisions: parseInt(player['Number of Divisions']) || 1
+                                divisions: divisions,
+                                numberOfDivisions: divisions.length
                             };
                             
                             // Only add if we have basic required info
@@ -918,11 +932,24 @@
                     }
                     
                     if (successCount > 0) {
-                        showAlert(`Successfully imported ${successCount} players! ${errorCount > 0 ? `(${errorCount} rows skipped)` : ''}`, 'success');
+                        let message = `Successfully imported ${successCount} players!`;
+                        if (guestPlayerCount > 0) {
+                            message += ` (${guestPlayerCount} guest players excluded)`;
+                        }
+                        if (errorCount > 0) {
+                            message += ` (${errorCount} rows skipped)`;
+                        }
+                        showAlert(message, 'success');
                         updateDivisionSelect();
                         
                         // Show first few players for verification
                         console.log('First 3 imported players:', playersData.slice(0, 3));
+                        
+                        // Show division breakdown
+                        const openCount = playersData.filter(p => p.divisions.includes('Open Division')).length;
+                        const over30Count = playersData.filter(p => p.divisions.includes('Over 30 Division')).length;
+                        const over40Count = playersData.filter(p => p.divisions.includes('Over 40 Division')).length;
+                        console.log(`Division breakdown: Open=${openCount}, Over30=${over30Count}, Over40=${over40Count}`);
                     } else {
                         showAlert('No valid player data found. Please check your CSV format.', 'error');
                     }
@@ -991,23 +1018,16 @@
             
             const divisions = new Set();
             
-            // Extract individual divisions from all players
+            // Extract divisions from player data
             playersData.forEach(player => {
-                player.divisions.forEach(divisionString => {
-                    if (divisionString && divisionString.trim()) {
-                        // Split by comma in case multiple divisions are listed together
-                        const individualDivisions = divisionString.split(',').map(d => d.trim());
-                        individualDivisions.forEach(division => {
-                            if (division) {
-                                divisions.add(division);
-                            }
-                        });
-                    }
+                player.divisions.forEach(division => {
+                    divisions.add(division);
                 });
             });
             
-            // Sort divisions alphabetically and add to dropdown
-            Array.from(divisions).sort().forEach(division => {
+            // Sort divisions and add to dropdown
+            const sortedDivisions = Array.from(divisions).sort();
+            sortedDivisions.forEach(division => {
                 const option = document.createElement('option');
                 option.value = division;
                 option.textContent = division;
@@ -1034,9 +1054,9 @@
                 return;
             }
             
-            // Filter players for selected division
+            // Filter players for selected division using new structure
             selectedDivisionData = playersData.filter(player => 
-                player.divisions.some(d => d.includes(division) || division.includes(d))
+                player.divisions.includes(division)
             );
             
             if (selectedDivisionData.length === 0) {
@@ -1047,12 +1067,17 @@
             console.log(`\n=== GENERATING TEAMS FOR ${division} ===`);
             console.log(`Players in division: ${selectedDivisionData.length}`);
             
-            // Show requests for debugging
+            // Show requests for debugging based on division
             selectedDivisionData.forEach(player => {
-                const requests = division.includes('Open') ? 
-                    player.openDivisionRequests : player.o30o40Requests;
+                let requests = [];
+                if (division === 'Open Division') {
+                    requests = player.openDivisionRequests;
+                } else if (division === 'Over 30 Division' || division === 'Over 40 Division') {
+                    requests = player.o30o40Requests;
+                }
+                
                 if (requests.length > 0) {
-                    console.log(`${player.fullName} requests: ${requests.join(', ')}`);
+                    console.log(`${player.fullName} (Level ${player.boardExperience}) requests: ${requests.join(', ')}`);
                 }
             });
             
@@ -1127,14 +1152,14 @@
                                 <div class="player-info">
                                     <strong>${player.fullName}</strong>
                                     <div style="font-size: 12px; color: #666;">
-                                        ${player.position} • ${player.experience} • Missed: ${player.missedGames}
+                                        ${player.position} • Level ${player.boardExperience} • Missed: ${player.missedGames}
                                     </div>
                                 </div>
                                 <div class="player-tags">
                                     ${player.position === 'Keeper/Goalie' ? '<span class="tag goalie">GK</span>' : ''}
                                     ${player.isTeamRep ? '<span class="tag tr">TR</span>' : ''}
-                                    ${player.experience === 'Advanced' || player.experience === 'College Competitive' ? '<span class="tag advanced">ADV</span>' : ''}
-                                    ${player.experience === 'Beginner' ? '<span class="tag beginner">BEG</span>' : ''}
+                                    ${player.boardExperience === 3 ? '<span class="tag advanced">L3</span>' : ''}
+                                    ${player.boardExperience === 1 ? '<span class="tag beginner">L1</span>' : ''}
                                 </div>
                             </li>
                         `).join('')}
@@ -1149,16 +1174,20 @@
                 return;
             }
             
-            let csvContent = 'Team,Player Name,Position,Experience,Missed Games,Team Rep,Requests\n';
+            let csvContent = 'Team,Player Name,Position,Board Experience Level,Missed Games,Team Rep,Requests\n';
             
             currentTeams.forEach(team => {
                 team.players.forEach(player => {
                     const division = document.getElementById('selectedDivision').value;
-                    const requests = division.includes('Open') ? 
-                        player.openDivisionRequests.join('; ') : 
-                        player.o30o40Requests.join('; ');
+                    let requests = '';
                     
-                    csvContent += `"${team.name}","${player.fullName}","${player.position}","${player.experience}","${player.missedGames}","${player.isTeamRep ? 'Yes' : 'No'}","${requests}"\n`;
+                    if (division === 'Open Division') {
+                        requests = player.openDivisionRequests.join('; ');
+                    } else if (division === 'Over 30 Division' || division === 'Over 40 Division') {
+                        requests = player.o30o40Requests.join('; ');
+                    }
+                    
+                    csvContent += `"${team.name}","${player.fullName}","${player.position}","Level ${player.boardExperience}","${player.missedGames}","${player.isTeamRep ? 'Yes' : 'No'}","${requests}"\n`;
                 });
             });
             
