@@ -280,6 +280,11 @@
 
             <div id="error" class="error"></div>
 
+            <div id="warnings" class="error" style="background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; display: none;">
+                <h4>⚠️ Warnings</h4>
+                <ul id="warningsList"></ul>
+            </div>
+
             <div id="results" class="results">
                 <div id="stats" class="stats"></div>
                 <div style="margin-bottom: 30px;">
@@ -761,7 +766,20 @@
 
         function displayResults(teams) {
             displayStats(teams);
+            displayWarnings(teams.warnings || []);
             displayTeams(teams);
+        }
+
+        function displayWarnings(warnings) {
+            const warningsDiv = document.getElementById('warnings');
+            const warningsList = document.getElementById('warningsList');
+            
+            if (warnings.length > 0) {
+                warningsList.innerHTML = warnings.map(warning => `<li>${warning}</li>`).join('');
+                warningsDiv.style.display = 'block';
+            } else {
+                warningsDiv.style.display = 'none';
+            }
         }
 
         function displayStats(teams) {
@@ -886,6 +904,7 @@
 
         function hideError() {
             document.getElementById('error').style.display = 'none';
+            document.getElementById('warnings').style.display = 'none';
         }
     </script>
 </body>
