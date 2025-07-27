@@ -453,10 +453,23 @@
             );
             
             const gkDistribution = calculateDistribution(goalkeepers.length, teamCount);
-            goalkeepers.forEach((gk, index) => {
-                const teamIndex = assignToTeamByDistribution(teams, gkDistribution, 'goalkeepers');
-                if (teamIndex !== -1) {
-                    addPlayerToTeam(teams[teamIndex], gk);
+            goalkeepers.forEach((gk) => {
+                // Find teams that still need goalkeepers (haven't reached their target)
+                let bestTeamIndex = -1;
+                for (let i = 0; i < teams.length; i++) {
+                    if (teams[i].goalkeepers < gkDistribution[i] && teams[i].players.length < teams[i].targetSize) {
+                        bestTeamIndex = i;
+                        break;
+                    }
+                }
+                
+                // Fallback to smallest team if no team specifically needs goalkeepers
+                if (bestTeamIndex === -1) {
+                    bestTeamIndex = findSmallestTeam(teams);
+                }
+                
+                if (bestTeamIndex !== -1) {
+                    addPlayerToTeam(teams[bestTeamIndex], gk);
                     remainingPlayers = remainingPlayers.filter(p => p.name !== gk.name);
                 }
             });
@@ -487,10 +500,24 @@
             // Priority 5: Distribute TRs
             const teamReps = remainingPlayers.filter(p => p.isTR);
             const trDistribution = calculateDistribution(teamReps.length, teamCount);
+            
             teamReps.forEach((tr) => {
-                const teamIndex = assignToTeamByDistribution(teams, trDistribution, 'teamReps');
-                if (teamIndex !== -1) {
-                    addPlayerToTeam(teams[teamIndex], tr);
+                // Find teams that still need TRs (haven't reached their target)
+                let bestTeamIndex = -1;
+                for (let i = 0; i < teams.length; i++) {
+                    if (teams[i].teamReps < trDistribution[i] && teams[i].players.length < teams[i].targetSize) {
+                        bestTeamIndex = i;
+                        break;
+                    }
+                }
+                
+                // Fallback to smallest team if no team specifically needs TRs
+                if (bestTeamIndex === -1) {
+                    bestTeamIndex = findSmallestTeam(teams);
+                }
+                
+                if (bestTeamIndex !== -1) {
+                    addPlayerToTeam(teams[bestTeamIndex], tr);
                     remainingPlayers = remainingPlayers.filter(p => p.name !== tr.name);
                 }
             });
