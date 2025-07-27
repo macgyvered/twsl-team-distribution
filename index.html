@@ -485,7 +485,10 @@
         }
 
         function balanceTeams(players, teamCount) {
-            // Initialize teams
+            // Step 1: Calculate target team sizes (FIRST PRIORITY)
+            const targetSizes = calculateTeamSizes(players.length, teamCount);
+            
+            // Initialize teams with target sizes
             const teams = Array.from({ length: teamCount }, (_, i) => ({
                 id: i + 1,
                 name: `Team ${i + 1}`,
@@ -494,24 +497,28 @@
                 goalkeepers: 0,
                 teamReps: 0,
                 positions: {},
-                missedGamesDistribution: {}
+                missedGamesDistribution: {},
+                targetSize: targetSizes[i],
+                isFull: false
             }));
 
             // Create a copy of players to work with
             let availablePlayers = [...players];
 
-            // Step 1: Handle reciprocal requests first (highest priority)
+            // Step 2: Handle reciprocal requests first (priority 3)
             const reciprocalPairs = findReciprocalRequests(availablePlayers);
             reciprocalPairs.forEach(pair => {
                 const bestTeam = findBestTeamForPair(teams, pair);
-                addPlayerToTeam(teams[bestTeam], pair[0]);
-                addPlayerToTeam(teams[bestTeam], pair[1]);
-                availablePlayers = availablePlayers.filter(p => 
-                    p.name !== pair[0].name && p.name !== pair[1].name
-                );
+                if (bestTeam !== -1) {
+                    addPlayerToTeam(teams[bestTeam], pair[0]);
+                    addPlayerToTeam(teams[bestTeam], pair[1]);
+                    availablePlayers = availablePlayers.filter(p => 
+                        p.name !== pair[0].name && p.name !== pair[1].name
+                    );
+                }
             });
 
-            // Step 2: Distribute goalkeepers
+            // Step 3: Distribute goalkeepers (priority 2)
             const goalkeepers = availablePlayers.filter(p => {
                 const pos = p.position.toLowerCase();
                 return (pos.includes('goal') || pos.includes('keeper')) && 
@@ -520,19 +527,23 @@
             
             goalkeepers.forEach(gk => {
                 const bestTeam = findBestTeamForGoalkeeper(teams, gk);
-                addPlayerToTeam(teams[bestTeam], gk);
-                availablePlayers = availablePlayers.filter(p => p.name !== gk.name);
+                if (bestTeam !== -1) {
+                    addPlayerToTeam(teams[bestTeam], gk);
+                    availablePlayers = availablePlayers.filter(p => p.name !== gk.name);
+                }
             });
 
-            // Step 3: Distribute Team Representatives
+            // Step 4: Distribute Team Representatives (priority 5)
             const teamReps = availablePlayers.filter(p => p.isTR);
             teamReps.forEach(tr => {
                 const bestTeam = findBestTeamForTR(teams, tr);
-                addPlayerToTeam(teams[bestTeam], tr);
-                availablePlayers = availablePlayers.filter(p => p.name !== tr.name);
+                if (bestTeam !== -1) {
+                    addPlayerToTeam(teams[bestTeam], tr);
+                    availablePlayers = availablePlayers.filter(p => p.name !== tr.name);
+                }
             });
 
-            // Step 4: Handle one-way requests
+            // Step 5: Handle one-way requests (priority 6)
             const playersWithRequests = availablePlayers.filter(p => p.allRequests.length > 0);
             playersWithRequests.forEach(player => {
                 const bestTeam = findBestTeamForRequestedPlayer(teams, player, availablePlayers);
@@ -542,7 +553,7 @@
                 }
             });
 
-            // Step 5: Distribute remaining players by experience and missed games
+            // Step 6: Distribute remaining players by experience and missed games (priorities 4 & 7)
             availablePlayers.sort((a, b) => {
                 // Sort by experience (high to low), then by missed games (high to low)
                 if (a.experience !== b.experience) {
@@ -553,10 +564,27 @@
 
             availablePlayers.forEach(player => {
                 const bestTeam = findBestBalancedTeam(teams, player);
-                addPlayerToTeam(teams[bestTeam], player);
+                if (bestTeam !== -1) {
+                    addPlayerToTeam(teams[bestTeam], player);
+                }
             });
 
             return teams;
+        }
+
+        function calculateTeamSizes(totalPlayers, numTeams) {
+            const baseSize = Math.floor(totalPlayers / numTeams);
+            const extras = totalPlayers % numTeams;
+            
+            // Start with base size for all teams
+            const sizes = Array(numTeams).fill(baseSize);
+            
+            // Add one extra player to the last 'extras' teams
+            for (let i = numTeams - extras; i < numTeams; i++) {
+                sizes[i]++;
+            }
+            
+            return sizes;
         }
 
         function findReciprocalRequests(players) {
@@ -688,6 +716,12 @@
         }
 
         function addPlayerToTeam(team, player) {
+            // Don't add if team is already full
+            if (team.players.length >= team.targetSize) {
+                team.isFull = true;
+                return false;
+            }
+
             team.players.push(player);
             team.totalExperience += player.experience;
             
@@ -707,6 +741,13 @@
             // Track missed games
             team.missedGamesDistribution[player.missedGames] = 
                 (team.missedGamesDistribution[player.missedGames] || 0) + 1;
+
+            // Mark as full if we've reached target size
+            if (team.players.length >= team.targetSize) {
+                team.isFull = true;
+            }
+
+            return true;
         }
 
         function getMissedGamesWeight(missedGames) {
