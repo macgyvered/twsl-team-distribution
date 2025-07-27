@@ -629,27 +629,32 @@
             return findBestBalancedTeam(teams, tr);
         }
 
-        function findBestTeamForRequestedPlayer(teams, player, availablePlayers) {
-            let bestTeam = -1;
-            let bestScore = -1;
+                    function findBestTeamForRequestedPlayer(teams, player, availablePlayers) {
+                // If this is called with team indices array, handle it properly
+                const teamsToCheck = Array.isArray(teams) && typeof teams[0] === 'number' ? 
+                    teams.map(i => ({ ...generatedTeams[i], index: i })) : 
+                    teams.map((team, i) => ({ ...team, index: i }));
 
-            teams.forEach((team, index) => {
-                let score = 0;
-                
-                // Check if any requested players are on this team
-                player.allRequests.forEach(requestName => {
-                    const isOnTeam = team.players.some(p => matchesName(p.name, requestName));
-                    if (isOnTeam) score += 10;
+                let bestTeam = -1;
+                let bestScore = -1;
+
+                teamsToCheck.forEach((team) => {
+                    let score = 0;
+                    
+                    // Check if any requested players are on this team
+                    player.allRequests.forEach(requestName => {
+                        const isOnTeam = team.players.some(p => matchesName(p.name, requestName));
+                        if (isOnTeam) score += 10;
+                    });
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestTeam = team.index;
+                    }
                 });
 
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestTeam = index;
-                }
-            });
-
-            return bestTeam === -1 ? findBestBalancedTeam(teams, player) : bestTeam;
-        }
+                return bestTeam === -1 ? findBestBalancedTeam(teams, player) : bestTeam;
+            }
 
         function findBestBalancedTeam(teams, player, teamIndices = null) {
             const teamsToCheck = teamIndices || teams.map((_, i) => i);
@@ -857,3 +862,30 @@
         }
 
         function downloadCSV(data, filename) {
+            const csv = Papa.unparse(data);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
