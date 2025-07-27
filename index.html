@@ -333,7 +333,6 @@
                         </button>
                     </div>
                 </div>
-                <button class="btn" onclick="loadSampleData()">Load Sample Data</button>
                 <button class="btn btn-success" onclick="importData()">Import Data</button>
             </div>
 
@@ -456,23 +455,40 @@
 
                 // Build request map
                 this.players.forEach(player => {
-                    const requests = this.division.includes('Open') ? 
-                        player.openDivisionRequests : player.o30o40Requests;
-                    requestMap.set(player.fullName.toLowerCase(), requests.map(r => r.toLowerCase()));
+                    const requests = this.getPlayerRequests(player);
+                    requestMap.set(player.fullName.toLowerCase(), {
+                        player: player,
+                        requests: requests.map(r => r.toLowerCase())
+                    });
                 });
 
                 // Find reciprocals
                 this.players.forEach(player => {
                     const playerName = player.fullName.toLowerCase();
-                    const requests = requestMap.get(playerName) || [];
+                    const playerData = requestMap.get(playerName);
+                    if (!playerData) return;
                     
-                    requests.forEach(requestedName => {
-                        const requestedPlayerRequests = requestMap.get(requestedName) || [];
-                        if (requestedPlayerRequests.includes(playerName)) {
-                            // Found reciprocal
-                            const pair = [playerName, requestedName].sort();
-                            if (!reciprocals.some(r => r[0] === pair[0] && r[1] === pair[1])) {
-                                reciprocals.push(pair);
+                    playerData.requests.forEach(requestedName => {
+                        // Find the actual player being requested
+                        const requestedPlayer = this.players.find(p => 
+                            this.namesMatch(p.fullName, requestedName)
+                        );
+                        
+                        if (requestedPlayer) {
+                            const requestedPlayerData = requestMap.get(requestedPlayer.fullName.toLowerCase());
+                            if (requestedPlayerData) {
+                                // Check if the requested player also requests this player back
+                                const isReciprocal = requestedPlayerData.requests.some(reqName =>
+                                    this.namesMatch(player.fullName, reqName)
+                                );
+                                
+                                if (isReciprocal) {
+                                    // Found reciprocal - ensure we don't add duplicates
+                                    const pair = [playerName, requestedPlayer.fullName.toLowerCase()].sort();
+                                    if (!reciprocals.some(r => r[0] === pair[0] && r[1] === pair[1])) {
+                                        reciprocals.push(pair);
+                                    }
+                                }
                             }
                         }
                     });
@@ -483,19 +499,19 @@
 
             // Distribute players across teams
             distributeTeams() {
-                // Step 1: Distribute goalies first
+                // Step 1: Distribute goalies first (highest priority)
                 this.distributeGoalies();
                 
-                // Step 2: Distribute team reps
-                this.distributeTeamReps();
+                // Step 2: Handle ALL teammate requests (second highest priority)
+                this.handleAllTeammateRequests();
                 
-                // Step 3: Handle reciprocal requests
-                this.handleReciprocalRequests();
+                // Step 3: Distribute team reps to teams that need them
+                this.distributeTeamReps();
                 
                 // Step 4: Distribute remaining players by experience and missed games
                 this.distributeRemainingPlayers();
                 
-                // Step 5: Balance teams
+                // Step 5: Final balance optimization
                 this.balanceTeams();
                 
                 // Calculate final stats
@@ -551,23 +567,99 @@
                 });
             }
 
+            handleAllTeammateRequests() {
+                // Step 1: Handle reciprocal requests first (highest priority)
+                this.handleReciprocalRequests();
+                
+                // Step 2: Handle non-reciprocal requests (still high priority)
+                this.handleNonReciprocalRequests();
+            }
+
             handleReciprocalRequests() {
                 const reciprocals = this.findReciprocalRequests();
+                
+                console.log('Found reciprocal requests:', reciprocals);
                 
                 reciprocals.forEach(pair => {
                     const player1 = this.players.find(p => p.fullName.toLowerCase() === pair[0]);
                     const player2 = this.players.find(p => p.fullName.toLowerCase() === pair[1]);
                     
                     if (player1 && player2 && !this.isAssigned(player1) && !this.isAssigned(player2)) {
-                        // Find team with space for both
+                        // Find team with space for both (prefer teams with fewer players)
                         const teamsBySize = [...this.teams].sort((a, b) => a.players.length - b.players.length);
                         const targetTeam = teamsBySize[0];
                         
                         targetTeam.players.push(player1, player2);
                         player1.assigned = true;
                         player2.assigned = true;
+                        
+                        console.log(`Assigned reciprocal pair: ${player1.fullName} & ${player2.fullName} to ${targetTeam.name}`);
                     }
                 });
+            }
+            
+            handleNonReciprocalRequests() {
+                const unassignedPlayers = this.players.filter(p => !this.isAssigned(p));
+                
+                // Sort by number of requests (players with more requests get priority)
+                unassignedPlayers.sort((a, b) => {
+                    const aRequests = this.getPlayerRequests(a).length;
+                    const bRequests = this.getPlayerRequests(b).length;
+                    return bRequests - aRequests; // More requests first
+                });
+                
+                unassignedPlayers.forEach(player => {
+                    if (this.isAssigned(player)) return;
+                    
+                    const requests = this.getPlayerRequests(player);
+                    let bestTeam = null;
+                    let teammatesOnTeam = 0;
+                    
+                    // Check each team to see how many requested teammates are already there
+                    this.teams.forEach(team => {
+                        const matchingTeammates = team.players.filter(teammate => 
+                            requests.some(requestName => 
+                                this.namesMatch(teammate.fullName, requestName)
+                            )
+                        ).length;
+                        
+                        if (matchingTeammates > teammatesOnTeam) {
+                            bestTeam = team;
+                            teammatesOnTeam = matchingTeammates;
+                        }
+                    });
+                    
+                    // If no team has requested teammates, assign to smallest team
+                    if (!bestTeam || teammatesOnTeam === 0) {
+                        const teamsBySize = [...this.teams].sort((a, b) => a.players.length - b.players.length);
+                        bestTeam = teamsBySize[0];
+                    }
+                    
+                    if (bestTeam) {
+                        bestTeam.players.push(player);
+                        player.assigned = true;
+                        
+                        if (teammatesOnTeam > 0) {
+                            console.log(`Assigned ${player.fullName} to ${bestTeam.name} with ${teammatesOnTeam} requested teammate(s)`);
+                        }
+                    }
+                });
+            }
+            
+            getPlayerRequests(player) {
+                return this.division.includes('Open') ? 
+                    player.openDivisionRequests : player.o30o40Requests;
+            }
+            
+            namesMatch(fullName, requestName) {
+                const full = fullName.toLowerCase().trim();
+                const request = requestName.toLowerCase().trim();
+                
+                // Check for exact match or partial matches
+                return full.includes(request) || 
+                       request.includes(full) ||
+                       full.split(' ').some(part => request.includes(part)) ||
+                       request.split(' ').some(part => full.includes(part));
             }
 
             distributeRemainingPlayers() {
@@ -952,6 +1044,18 @@
                 return;
             }
             
+            console.log(`\n=== GENERATING TEAMS FOR ${division} ===`);
+            console.log(`Players in division: ${selectedDivisionData.length}`);
+            
+            // Show requests for debugging
+            selectedDivisionData.forEach(player => {
+                const requests = division.includes('Open') ? 
+                    player.openDivisionRequests : player.o30o40Requests;
+                if (requests.length > 0) {
+                    console.log(`${player.fullName} requests: ${requests.join(', ')}`);
+                }
+            });
+            
             // Generate teams
             const distributor = new TeamDistributor(selectedDivisionData, teamCount, division);
             currentTeams = distributor.distributeTeams();
@@ -1223,10 +1327,7 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            // Load sample data automatically for demo
-            setTimeout(() => {
-                loadSampleData();
-            }, 1000);
+            // Ready for user to import their own data
         });
     </script>
 </body>
