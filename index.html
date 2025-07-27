@@ -393,18 +393,38 @@
                 name: player['Full Name'],
                 experience: parseFloat(player['Board Assigned Experience (1-3)']) || 1,
                 position: player['Position'] || 'Field Player',
-                missedGames: player['Missed Games'] || 0,
+                missedGames: getMissedGamesValue(player['Missed Games']),
                 isTR: player['TR'] === 'Yes' || player['TR'] === 'yes' || player['TR'] === true,
-                requests: parseRequests(player['(Open Division) Requests'], player['(O30 or O40) Requests'])
+                requests: getPlayerRequests(player, division)
             }));
         }
 
-        function parseRequests(openReqs, o30Reqs) {
+        function getMissedGamesValue(value) {
+            if (typeof value === 'number') return value;
+            if (value === '4+') return 4;
+            return parseInt(value) || 0;
+        }
+
+        function getPlayerRequests(player, division) {
             const requests = [];
+            let requestColumns = [];
             
-            [openReqs, o30Reqs].forEach(reqString => {
-                if (reqString && typeof reqString === 'string' && reqString.toLowerCase() !== 'none') {
-                    requests.push(...reqString.split(',').map(name => name.trim()).filter(name => name));
+            // Get the right request columns based on division
+            if (division === 'Open Division') {
+                requestColumns = ['(Open Division) Requests', '(Open Division) Requests 2', '(Open Division) Requests 3'];
+            } else if (division === 'Over 30 Division') {
+                requestColumns = ['(O30) Requests', '(O30) Requests 2', '(O30) Requests 3'];
+            } else if (division === 'Over 40 Division') {
+                requestColumns = ['(O40) Requests', '(O40) Requests 2', '(O40) Requests 3'];
+            }
+            
+            requestColumns.forEach(col => {
+                const value = player[col];
+                if (value && value !== null && value !== 'null' && typeof value === 'string') {
+                    const trimmed = value.trim();
+                    if (trimmed && trimmed.toLowerCase() !== 'none') {
+                        requests.push(trimmed);
+                    }
                 }
             });
             
@@ -412,7 +432,7 @@
         }
 
         function balanceTeams(players, teamCount) {
-            // Calculate target team sizes
+            // Priority 1: Calculate target team sizes
             const targetSizes = calculateTeamSizes(players.length, teamCount);
             
             // Initialize teams
@@ -420,61 +440,67 @@
                 id: i + 1,
                 name: `Team ${i + 1}`,
                 players: [],
-                targetSize: targetSizes[i]
+                targetSize: targetSizes[i],
+                goalkeepers: 0,
+                teamReps: 0
             }));
 
             let remainingPlayers = [...players];
 
-            // Step 1: Handle reciprocal pairs
-            const pairs = findReciprocalPairs(remainingPlayers);
-            pairs.forEach(pair => {
-                const team = findBestTeamForPair(teams, pair);
-                if (team && team.players.length + 2 <= team.targetSize) {
-                    team.players.push(pair[0], pair[1]);
+            // Priority 2: Distribute goalkeepers first
+            const goalkeepers = remainingPlayers.filter(p => 
+                p.position.toLowerCase().includes('keeper')
+            );
+            
+            const gkDistribution = calculateDistribution(goalkeepers.length, teamCount);
+            goalkeepers.forEach((gk, index) => {
+                const teamIndex = assignToTeamByDistribution(teams, gkDistribution, 'goalkeepers');
+                if (teamIndex !== -1) {
+                    addPlayerToTeam(teams[teamIndex], gk);
+                    remainingPlayers = remainingPlayers.filter(p => p.name !== gk.name);
+                }
+            });
+
+            // Priority 3: Handle reciprocal pairs
+            const reciprocalPairs = findReciprocalPairs(remainingPlayers);
+            reciprocalPairs.forEach(pair => {
+                const teamIndex = findBestTeamForPair(teams, pair);
+                if (teamIndex !== -1) {
+                    addPlayerToTeam(teams[teamIndex], pair[0]);
+                    addPlayerToTeam(teams[teamIndex], pair[1]);
                     remainingPlayers = remainingPlayers.filter(p => 
                         p.name !== pair[0].name && p.name !== pair[1].name
                     );
                 }
             });
 
-            // Step 2: Distribute goalkeepers
-            const goalkeepers = remainingPlayers.filter(p => 
-                p.position.toLowerCase().includes('keeper')
-            );
-            goalkeepers.forEach(gk => {
-                const team = findTeamNeedingPlayer(teams, 'goalkeeper');
-                if (team) {
-                    team.players.push(gk);
-                    remainingPlayers = remainingPlayers.filter(p => p.name !== gk.name);
-                }
-            });
-
-            // Step 3: Distribute TRs
-            const teamReps = remainingPlayers.filter(p => p.isTR);
-            teamReps.forEach(tr => {
-                const team = findTeamNeedingPlayer(teams, 'tr');
-                if (team) {
-                    team.players.push(tr);
-                    remainingPlayers = remainingPlayers.filter(p => p.name !== tr.name);
-                }
-            });
-
-            // Step 4: Handle requests
+            // Priority 4: Handle one-way requests
             const playersWithRequests = remainingPlayers.filter(p => p.requests.length > 0);
             playersWithRequests.forEach(player => {
-                const team = findTeamForRequest(teams, player);
-                if (team) {
-                    team.players.push(player);
+                const teamIndex = findTeamForRequest(teams, player);
+                if (teamIndex !== -1) {
+                    addPlayerToTeam(teams[teamIndex], player);
                     remainingPlayers = remainingPlayers.filter(p => p.name !== player.name);
                 }
             });
 
-            // Step 5: Distribute remaining players
+            // Priority 5: Distribute TRs
+            const teamReps = remainingPlayers.filter(p => p.isTR);
+            const trDistribution = calculateDistribution(teamReps.length, teamCount);
+            teamReps.forEach((tr) => {
+                const teamIndex = assignToTeamByDistribution(teams, trDistribution, 'teamReps');
+                if (teamIndex !== -1) {
+                    addPlayerToTeam(teams[teamIndex], tr);
+                    remainingPlayers = remainingPlayers.filter(p => p.name !== tr.name);
+                }
+            });
+
+            // Priority 6: Distribute remaining players by experience
             remainingPlayers.sort((a, b) => b.experience - a.experience);
             remainingPlayers.forEach(player => {
-                const team = findSmallestTeam(teams);
-                if (team && team.players.length < team.targetSize) {
-                    team.players.push(player);
+                const teamIndex = findSmallestTeam(teams);
+                if (teamIndex !== -1) {
+                    addPlayerToTeam(teams[teamIndex], player);
                 }
             });
 
@@ -491,6 +517,31 @@
             }
             
             return sizes;
+        }
+
+        function calculateDistribution(totalItems, numTeams) {
+            if (totalItems === 0) return Array(numTeams).fill(0);
+            
+            const baseCount = Math.floor(totalItems / numTeams);
+            const extras = totalItems % numTeams;
+            const distribution = Array(numTeams).fill(baseCount);
+            
+            for (let i = numTeams - extras; i < numTeams; i++) {
+                distribution[i]++;
+            }
+            
+            return distribution;
+        }
+
+        function assignToTeamByDistribution(teams, distribution, property) {
+            for (let i = 0; i < teams.length; i++) {
+                if (teams[i][property] < distribution[i] && teams[i].players.length < teams[i].targetSize) {
+                    return i;
+                }
+            }
+            
+            // Fallback to smallest team
+            return findSmallestTeam(teams);
         }
 
         function findReciprocalPairs(players) {
@@ -524,56 +575,70 @@
             if (full === request) return true;
             
             const firstName = full.split(' ')[0];
+            const lastName = full.split(' ').pop();
+            
             if (firstName === request) return true;
+            if (lastName === request && lastName.length > 2) return true;
             
             return full.includes(request) || request.includes(firstName);
         }
 
         function findBestTeamForPair(teams, pair) {
-            return teams
-                .filter(team => team.players.length + 2 <= team.targetSize)
-                .sort((a, b) => a.players.length - b.players.length)[0];
-        }
-
-        function findTeamNeedingPlayer(teams, type) {
-            const availableTeams = teams.filter(team => team.players.length < team.targetSize);
+            const availableTeams = teams.filter(team => team.players.length + 2 <= team.targetSize);
+            if (availableTeams.length === 0) return -1;
             
-            if (type === 'goalkeeper') {
-                const teamsWithoutGK = availableTeams.filter(team => 
-                    !team.players.some(p => p.position.toLowerCase().includes('keeper'))
-                );
-                if (teamsWithoutGK.length > 0) return teamsWithoutGK[0];
-            }
-            
-            if (type === 'tr') {
-                const teamsWithoutTR = availableTeams.filter(team => 
-                    !team.players.some(p => p.isTR)
-                );
-                if (teamsWithoutTR.length > 0) return teamsWithoutTR[0];
-            }
-            
-            return availableTeams[0];
+            // Sort by current size (smallest first)
+            availableTeams.sort((a, b) => a.players.length - b.players.length);
+            return teams.indexOf(availableTeams[0]);
         }
 
         function findTeamForRequest(teams, player) {
-            const availableTeams = teams.filter(team => team.players.length < team.targetSize);
-            
-            // Try to honor requests
-            for (const team of availableTeams) {
-                if (player.requests.some(reqName => 
+            // Try to honor requests first
+            for (let i = 0; i < teams.length; i++) {
+                const team = teams[i];
+                if (team.players.length >= team.targetSize) continue;
+                
+                const hasRequestedPlayer = player.requests.some(reqName => 
                     team.players.some(p => matchesName(p.name, reqName))
-                )) {
-                    return team;
+                );
+                
+                if (hasRequestedPlayer) {
+                    return i;
                 }
             }
             
-            return findSmallestTeam(availableTeams);
+            // Fallback to smallest team
+            return findSmallestTeam(teams);
         }
 
         function findSmallestTeam(teams) {
-            return teams
-                .filter(team => team.players.length < team.targetSize)
-                .sort((a, b) => a.players.length - b.players.length)[0];
+            let smallestIndex = -1;
+            let smallestSize = Infinity;
+            
+            for (let i = 0; i < teams.length; i++) {
+                if (teams[i].players.length < teams[i].targetSize && teams[i].players.length < smallestSize) {
+                    smallestSize = teams[i].players.length;
+                    smallestIndex = i;
+                }
+            }
+            
+            return smallestIndex;
+        }
+
+        function addPlayerToTeam(team, player) {
+            if (team.players.length >= team.targetSize) return false;
+            
+            team.players.push(player);
+            
+            if (player.position.toLowerCase().includes('keeper')) {
+                team.goalkeepers++;
+            }
+            
+            if (player.isTR) {
+                team.teamReps++;
+            }
+            
+            return true;
         }
 
         function displayResults(teams) {
@@ -586,13 +651,28 @@
             const teamSizes = teams.map(team => team.players.length);
             const sizeDiff = Math.max(...teamSizes) - Math.min(...teamSizes);
             
-            const goalkeepers = teams.filter(team => 
-                team.players.some(p => p.position.toLowerCase().includes('keeper'))
-            ).length;
+            const teamsWithGoalkeepers = teams.filter(team => team.goalkeepers > 0).length;
+            const teamsWithTRs = teams.filter(team => team.teamReps > 0).length;
             
-            const trs = teams.filter(team => 
-                team.players.some(p => p.isTR)
-            ).length;
+            // Calculate reciprocal pairs honored
+            const allPlayers = teams.flatMap(team => team.players);
+            const reciprocalPairs = findReciprocalPairs(allPlayers);
+            const pairedPlayers = new Set();
+            let pairsHonored = 0;
+            
+            reciprocalPairs.forEach(pair => {
+                pairedPlayers.add(pair[0].name);
+                pairedPlayers.add(pair[1].name);
+            });
+            
+            teams.forEach(team => {
+                const teamPlayerNames = team.players.map(p => p.name);
+                reciprocalPairs.forEach(pair => {
+                    if (teamPlayerNames.includes(pair[0].name) && teamPlayerNames.includes(pair[1].name)) {
+                        pairsHonored++;
+                    }
+                });
+            });
 
             document.getElementById('stats').innerHTML = `
                 <h3>📊 Team Formation Results</h3>
@@ -610,12 +690,16 @@
                         <div class="stat-label">Size Difference</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-value">${goalkeepers}</div>
+                        <div class="stat-value">${teamsWithGoalkeepers}</div>
                         <div class="stat-label">Teams with Goalkeepers</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-value">${trs}</div>
+                        <div class="stat-value">${teamsWithTRs}</div>
                         <div class="stat-label">Teams with TRs</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${pairsHonored}</div>
+                        <div class="stat-label">Reciprocal Pairs Honored</div>
                     </div>
                 </div>
             `;
@@ -638,7 +722,7 @@
                                     <li class="player-item">
                                         <span class="player-name">${player.name}</span>
                                         <span class="player-details">
-                                            ${player.experience} | ${player.position}
+                                            Exp: ${player.experience} | ${player.position}
                                             ${player.isTR ? ' | TR' : ''}
                                             ${player.position.toLowerCase().includes('keeper') ? ' | GK' : ''}
                                         </span>
@@ -653,7 +737,7 @@
 
         // Download functionality
         document.getElementById('downloadTeams').addEventListener('click', function() {
-            const csvData = [['Team', 'Player Name', 'Experience', 'Position', 'Team Rep']];
+            const csvData = [['Team', 'Player Name', 'Experience', 'Position', 'Missed Games', 'Team Rep']];
             
             generatedTeams.forEach(team => {
                 team.players.forEach(player => {
@@ -662,6 +746,7 @@
                         player.name,
                         player.experience,
                         player.position,
+                        player.missedGames,
                         player.isTR ? 'Yes' : 'No'
                     ]);
                 });
