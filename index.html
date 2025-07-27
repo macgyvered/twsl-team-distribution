@@ -938,14 +938,19 @@
                         showAlert(message, 'success');
                         updateDivisionSelect();
                         
-                        // Show first few players for verification
-                        console.log('First 3 imported players:', playersData.slice(0, 3));
-                        
-                        // Show division breakdown
+                        // Debug: Show division breakdown
                         const openCount = playersData.filter(p => p.divisions.includes('Open Division')).length;
                         const over30Count = playersData.filter(p => p.divisions.includes('Over 30 Division')).length;
                         const over40Count = playersData.filter(p => p.divisions.includes('Over 40 Division')).length;
-                        console.log(`Division breakdown: Open=${openCount}, Over30=${over30Count}, Over40=${over40Count}`);
+                        console.log(`Import complete: Open=${openCount}, Over30=${over30Count}, Over40=${over40Count}`);
+                        
+                        // Debug: List all Over 30 players
+                        console.log('\nAll Over 30 Division players imported:');
+                        const over30Players = playersData.filter(p => p.divisions.includes('Over 30 Division'));
+                        over30Players.forEach((player, index) => {
+                            console.log(`${index + 1}. ${player.fullName} (Level ${player.boardExperience})`);
+                        });
+                        
                     } else {
                         showAlert('No valid player data found. Please check your CSV format.', 'error');
                     }
@@ -1060,9 +1065,34 @@
                 return;
             }
             
+            console.log(`\n=== TEAM GENERATION FOR ${division} ===`);
+            console.log(`Expected players: ${selectedDivisionData.length}`);
+            
             // Generate teams
             const distributor = new TeamDistributor(selectedDivisionData, teamCount, division);
             currentTeams = distributor.distributeTeams();
+            
+            // Verify all players were assigned
+            const totalAssigned = currentTeams.reduce((sum, team) => sum + team.players.length, 0);
+            console.log(`Actually assigned: ${totalAssigned}`);
+            
+            if (totalAssigned !== selectedDivisionData.length) {
+                console.log(`\n❌ MISMATCH: Expected ${selectedDivisionData.length}, got ${totalAssigned}`);
+                
+                // Find missing players
+                const assignedNames = new Set();
+                currentTeams.forEach(team => {
+                    team.players.forEach(player => assignedNames.add(player.fullName));
+                });
+                
+                const missingPlayers = selectedDivisionData.filter(player => 
+                    !assignedNames.has(player.fullName)
+                );
+                
+                console.log('Missing players:', missingPlayers.map(p => p.fullName));
+            } else {
+                console.log(`✅ SUCCESS: All ${totalAssigned} players assigned correctly`);
+            }
             
             displayTeams();
             showAlert(`Successfully generated ${teamCount} teams for ${division}!`, 'success');
