@@ -488,23 +488,48 @@
 
             // Distribute players across teams
             distributeTeams() {
+                console.log(`\n=== TEAM DISTRIBUTION ALGORITHM ===`);
+                console.log(`Starting with ${this.players.length} players for ${this.teamCount} teams`);
+                
                 // Step 1: Distribute goalies first (highest priority)
+                console.log('\n--- Step 1: Distributing Goalies ---');
                 this.distributeGoalies();
+                const assignedAfterGoalies = this.teams.reduce((sum, team) => sum + team.players.length, 0);
+                console.log(`Players assigned after goalies: ${assignedAfterGoalies}`);
                 
                 // Step 2: Handle ALL teammate requests (second highest priority)
+                console.log('\n--- Step 2: Handling Teammate Requests ---');
                 this.handleAllTeammateRequests();
+                const assignedAfterRequests = this.teams.reduce((sum, team) => sum + team.players.length, 0);
+                console.log(`Players assigned after requests: ${assignedAfterRequests}`);
                 
                 // Step 3: Distribute team reps to teams that need them
+                console.log('\n--- Step 3: Distributing Team Reps ---');
                 this.distributeTeamReps();
+                const assignedAfterTRs = this.teams.reduce((sum, team) => sum + team.players.length, 0);
+                console.log(`Players assigned after TRs: ${assignedAfterTRs}`);
                 
                 // Step 4: Distribute remaining players by experience and missed games
+                console.log('\n--- Step 4: Distributing Remaining Players ---');
                 this.distributeRemainingPlayers();
+                const assignedAfterRemaining = this.teams.reduce((sum, team) => sum + team.players.length, 0);
+                console.log(`Players assigned after remaining: ${assignedAfterRemaining}`);
                 
                 // Step 5: Final balance optimization
+                console.log('\n--- Step 5: Final Balance ---');
                 this.balanceTeams();
                 
                 // Calculate final stats
                 this.calculateTeamStats();
+                
+                const finalAssigned = this.teams.reduce((sum, team) => sum + team.players.length, 0);
+                console.log(`\n=== FINAL RESULTS ===`);
+                console.log(`Total players assigned: ${finalAssigned} out of ${this.players.length}`);
+                
+                if (finalAssigned < this.players.length) {
+                    const unassigned = this.players.filter(p => !this.isAssigned(p));
+                    console.log('UNASSIGNED PLAYERS:', unassigned.map(p => p.fullName));
+                }
                 
                 return this.teams;
             }
@@ -1067,6 +1092,12 @@
             console.log(`\n=== GENERATING TEAMS FOR ${division} ===`);
             console.log(`Players in division: ${selectedDivisionData.length}`);
             
+            // Debug: List all players in this division
+            console.log('All players in this division:');
+            selectedDivisionData.forEach((player, index) => {
+                console.log(`${index + 1}. ${player.fullName} (Level ${player.boardExperience}, ${player.position}, Missed: ${player.missedGames}, TR: ${player.isTeamRep ? 'Yes' : 'No'})`);
+            });
+            
             // Show requests for debugging based on division
             selectedDivisionData.forEach(player => {
                 let requests = [];
@@ -1084,6 +1115,25 @@
             // Generate teams
             const distributor = new TeamDistributor(selectedDivisionData, teamCount, division);
             currentTeams = distributor.distributeTeams();
+            
+            // Debug: Check if all players were assigned
+            const totalAssigned = currentTeams.reduce((sum, team) => sum + team.players.length, 0);
+            console.log(`\n=== ASSIGNMENT RESULTS ===`);
+            console.log(`Expected players: ${selectedDivisionData.length}`);
+            console.log(`Actually assigned: ${totalAssigned}`);
+            
+            if (totalAssigned < selectedDivisionData.length) {
+                console.log('MISSING PLAYERS DETECTED!');
+                const assignedNames = new Set();
+                currentTeams.forEach(team => {
+                    team.players.forEach(player => assignedNames.add(player.fullName));
+                });
+                
+                const missingPlayers = selectedDivisionData.filter(player => 
+                    !assignedNames.has(player.fullName)
+                );
+                console.log('Missing players:', missingPlayers.map(p => p.fullName));
+            }
             
             displayTeams();
             showAlert(`Successfully generated ${teamCount} teams for ${division}!`, 'success');
