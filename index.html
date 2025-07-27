@@ -607,6 +607,14 @@
                 const teamIndex = findSmallestTeam(teams);
                 if (teamIndex !== -1) {
                     addPlayerToTeam(teams[teamIndex], player);
+                } else {
+                    // This should never happen with correct team size calculations
+                    // but handle it gracefully by forcing assignment
+                    const leastFullTeam = teams.reduce((min, team, index) => {
+                        return teams[min].players.length > team.players.length ? index : min;
+                    }, 0);
+                    addPlayerToTeam(teams[leastFullTeam], player, true);
+                    warnings.push(`Had to exceed target size to assign ${player.name}`);
                 }
             });
 
