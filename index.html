@@ -392,7 +392,9 @@
             const divisionColumns = ['Open Division', 'Over 30 Division', 'Over 40 Division'];
             
             divisionColumns.forEach(col => {
-                if (playerData.some(player => player[col] === 'Yes' || player[col] === 'yes' || player[col] === true)) {
+                if (playerData.some(player => 
+                    player[col] === 'Yes' || player[col] === 'yes' || player[col] === true
+                )) {
                     availableDivisions.push(col);
                 }
             });
@@ -473,9 +475,13 @@
 
         function parseRequests(requestString) {
             if (!requestString || typeof requestString !== 'string') return [];
+            
+            // Handle "None" or "none" explicitly
+            if (requestString.toLowerCase().trim() === 'none') return [];
+            
             return requestString.split(',')
                 .map(name => name.trim())
-                .filter(name => name.length > 0);
+                .filter(name => name.length > 0 && name.toLowerCase() !== 'none');
         }
 
         function balanceTeams(players, teamCount) {
@@ -506,10 +512,11 @@
             });
 
             // Step 2: Distribute goalkeepers
-            const goalkeepers = availablePlayers.filter(p => 
-                p.position.toLowerCase().includes('goal') || 
-                p.position.toLowerCase().includes('keeper')
-            );
+            const goalkeepers = availablePlayers.filter(p => {
+                const pos = p.position.toLowerCase();
+                return (pos.includes('goal') || pos.includes('keeper')) && 
+                       !pos.includes('except') && !pos.includes('anywhere except');
+            });
             
             goalkeepers.forEach(gk => {
                 const bestTeam = findBestTeamForGoalkeeper(teams, gk);
@@ -684,7 +691,8 @@
             team.players.push(player);
             team.totalExperience += player.experience;
             
-            if (player.position.toLowerCase().includes('goal')) {
+            if (player.position.toLowerCase().includes('goal') && 
+                !player.position.toLowerCase().includes('except')) {
                 team.goalkeepers++;
             }
             
