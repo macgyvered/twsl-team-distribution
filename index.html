@@ -929,9 +929,6 @@
                     
                     if (successCount > 0) {
                         let message = `Successfully imported ${successCount} players!`;
-                        if (guestPlayerCount > 0) {
-                            message += ` (${guestPlayerCount} guest players excluded)`;
-                        }
                         if (errorCount > 0) {
                             message += ` (${errorCount} rows skipped)`;
                         }
