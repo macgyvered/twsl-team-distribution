@@ -335,7 +335,6 @@
                 <div id="stats" class="stats"></div>
                 <div class="download-section" style="margin-bottom: 30px;">
                     <button id="downloadTeams" class="download-btn">📥 Download Teams CSV</button>
-                    <button id="downloadStats" class="download-btn">📊 Download Statistics CSV</button>
                 </div>
                 <div id="teamsDisplay" class="teams-grid"></div>
             </div>
@@ -485,10 +484,18 @@
         }
 
         function balanceTeams(players, teamCount) {
-            // Step 1: Calculate target team sizes (FIRST PRIORITY)
+            // Step 1: Calculate all target distributions upfront
             const targetSizes = calculateTeamSizes(players.length, teamCount);
-            
-            // Initialize teams with target sizes
+            const goalkeepers = players.filter(p => {
+                const pos = p.position.toLowerCase();
+                return (pos.includes('goal') || pos.includes('keeper')) && 
+                       !pos.includes('except') && !pos.includes('anywhere except');
+            });
+            const teamReps = players.filter(p => p.isTR);
+            const targetGKDistribution = calculateDistribution(goalkeepers.length, teamCount);
+            const targetTRDistribution = calculateDistribution(teamReps.length, teamCount);
+
+            // Initialize teams with all target information
             const teams = Array.from({ length: teamCount }, (_, i) => ({
                 id: i + 1,
                 name: `Team ${i + 1}`,
@@ -499,17 +506,20 @@
                 positions: {},
                 missedGamesDistribution: {},
                 targetSize: targetSizes[i],
-                isFull: false
+                targetGoalkeepers: targetGKDistribution[i],
+                targetTRs: targetTRDistribution[i],
+                needsGoalkeeper: targetGKDistribution[i] > 0,
+                needsTR: targetTRDistribution[i] > 0
             }));
 
-            // Create a copy of players to work with
+            // Track remaining players
             let availablePlayers = [...players];
 
-            // Step 2: Handle reciprocal requests first (priority 3)
+            // Step 2: Handle reciprocal pairs as single units (Priority 3)
             const reciprocalPairs = findReciprocalRequests(availablePlayers);
             reciprocalPairs.forEach(pair => {
-                const bestTeam = findBestTeamForPair(teams, pair);
-                if (bestTeam !== -1) {
+                const bestTeam = findMostConstrainedTeam(teams, 'pair', pair);
+                if (bestTeam !== -1 && teams[bestTeam].players.length + 2 <= teams[bestTeam].targetSize) {
                     addPlayerToTeam(teams[bestTeam], pair[0]);
                     addPlayerToTeam(teams[bestTeam], pair[1]);
                     availablePlayers = availablePlayers.filter(p => 
@@ -518,52 +528,53 @@
                 }
             });
 
-            // Step 3: Distribute goalkeepers (priority 2)
-            const goalkeepers = availablePlayers.filter(p => {
+            // Step 3: Distribute goalkeepers according to target distribution (Priority 2)
+            const remainingGoalkeepers = availablePlayers.filter(p => {
                 const pos = p.position.toLowerCase();
                 return (pos.includes('goal') || pos.includes('keeper')) && 
                        !pos.includes('except') && !pos.includes('anywhere except');
             });
             
-            goalkeepers.forEach(gk => {
-                const bestTeam = findBestTeamForGoalkeeper(teams, gk);
+            remainingGoalkeepers.forEach(gk => {
+                const bestTeam = findMostConstrainedTeam(teams, 'goalkeeper', gk);
                 if (bestTeam !== -1) {
                     addPlayerToTeam(teams[bestTeam], gk);
                     availablePlayers = availablePlayers.filter(p => p.name !== gk.name);
                 }
             });
 
-            // Step 4: Distribute Team Representatives (priority 5)
-            const teamReps = availablePlayers.filter(p => p.isTR);
-            teamReps.forEach(tr => {
-                const bestTeam = findBestTeamForTR(teams, tr);
+            // Step 4: Distribute Team Representatives according to target distribution (Priority 5)
+            const remainingTRs = availablePlayers.filter(p => p.isTR);
+            remainingTRs.forEach(tr => {
+                const bestTeam = findMostConstrainedTeam(teams, 'teamrep', tr);
                 if (bestTeam !== -1) {
                     addPlayerToTeam(teams[bestTeam], tr);
                     availablePlayers = availablePlayers.filter(p => p.name !== tr.name);
                 }
             });
 
-            // Step 5: Handle one-way requests (priority 6)
+            // Step 5: Handle one-way requests (Priority 6)
             const playersWithRequests = availablePlayers.filter(p => p.allRequests.length > 0);
             playersWithRequests.forEach(player => {
-                const bestTeam = findBestTeamForRequestedPlayer(teams, player, availablePlayers);
+                const bestTeam = findMostConstrainedTeam(teams, 'request', player);
                 if (bestTeam !== -1) {
                     addPlayerToTeam(teams[bestTeam], player);
                     availablePlayers = availablePlayers.filter(p => p.name !== player.name);
                 }
             });
 
-            // Step 6: Distribute remaining players by experience and missed games (priorities 4 & 7)
+            // Step 6: Distribute remaining players with round-robin constraint awareness
+            // Sort by experience and missed games first (Priorities 4 & 7)
             availablePlayers.sort((a, b) => {
-                // Sort by experience (high to low), then by missed games (high to low)
                 if (a.experience !== b.experience) {
                     return b.experience - a.experience;
                 }
                 return getMissedGamesWeight(b.missedGames) - getMissedGamesWeight(a.missedGames);
             });
 
+            // Use constraint-aware assignment to guarantee even distribution
             availablePlayers.forEach(player => {
-                const bestTeam = findBestBalancedTeam(teams, player);
+                const bestTeam = findMostConstrainedTeam(teams, 'general', player);
                 if (bestTeam !== -1) {
                     addPlayerToTeam(teams[bestTeam], player);
                 }
@@ -572,19 +583,89 @@
             return teams;
         }
 
-        function calculateTeamSizes(totalPlayers, numTeams) {
-            const baseSize = Math.floor(totalPlayers / numTeams);
-            const extras = totalPlayers % numTeams;
+        function calculateDistribution(totalItems, numTeams) {
+            if (totalItems === 0) return Array(numTeams).fill(0);
             
-            // Start with base size for all teams
-            const sizes = Array(numTeams).fill(baseSize);
+            const baseCount = Math.floor(totalItems / numTeams);
+            const extras = totalItems % numTeams;
             
-            // Add one extra player to the last 'extras' teams
+            const distribution = Array(numTeams).fill(baseCount);
+            
+            // Add extras to last teams (same pattern as team sizes)
             for (let i = numTeams - extras; i < numTeams; i++) {
-                sizes[i]++;
+                distribution[i]++;
             }
             
-            return sizes;
+            return distribution;
+        }
+
+        function findMostConstrainedTeam(teams, assignmentType, playerOrPair) {
+            let eligibleTeams = [];
+
+            // Filter teams based on assignment type and constraints
+            teams.forEach((team, index) => {
+                let isEligible = false;
+                let priority = 0;
+
+                switch (assignmentType) {
+                    case 'pair':
+                        // Must have room for 2 players
+                        isEligible = team.players.length + 2 <= team.targetSize;
+                        // Prefer teams further behind their target size
+                        priority = (team.targetSize - team.players.length);
+                        break;
+
+                    case 'goalkeeper':
+                        // Must have room and need a goalkeeper
+                        isEligible = team.players.length < team.targetSize && 
+                                   team.goalkeepers < team.targetGoalkeepers;
+                        // Prefer teams that need goalkeepers most
+                        priority = (team.targetGoalkeepers - team.goalkeepers) * 100 + 
+                                 (team.targetSize - team.players.length);
+                        break;
+
+                    case 'teamrep':
+                        // Must have room and need a TR
+                        isEligible = team.players.length < team.targetSize && 
+                                   team.teamReps < team.targetTRs;
+                        priority = (team.targetTRs - team.teamReps) * 100 + 
+                                 (team.targetSize - team.players.length);
+                        break;
+
+                    case 'request':
+                        // Must have room
+                        isEligible = team.players.length < team.targetSize;
+                        // Check if any requested players are on this team
+                        let requestBonus = 0;
+                        playerOrPair.allRequests.forEach(requestName => {
+                            if (team.players.some(p => matchesName(p.name, requestName))) {
+                                requestBonus += 1000; // High priority for honoring requests
+                            }
+                        });
+                        priority = requestBonus + (team.targetSize - team.players.length);
+                        break;
+
+                    case 'general':
+                        // Must have room
+                        isEligible = team.players.length < team.targetSize;
+                        // Prefer teams furthest behind target, then best experience balance
+                        const spacesRemaining = team.targetSize - team.players.length;
+                        const experienceBalance = team.players.length > 0 ? 
+                            team.totalExperience / team.players.length : 0;
+                        priority = spacesRemaining * 100 - experienceBalance;
+                        break;
+                }
+
+                if (isEligible) {
+                    eligibleTeams.push({ index, priority });
+                }
+            });
+
+            if (eligibleTeams.length === 0) return -1;
+
+            // Return team with highest priority (most constrained/needy)
+            eligibleTeams.sort((a, b) => b.priority - a.priority);
+            return eligibleTeams[0].index;
         }
 
         function findReciprocalRequests(players) {
@@ -796,6 +877,13 @@
 
         function displayStats() {
             const statsDiv = document.getElementById('stats');
+            
+            // Calculate team size distribution
+            const teamSizes = generatedTeams.map(team => team.players.length);
+            const minSize = Math.min(...teamSizes);
+            const maxSize = Math.max(...teamSizes);
+            const sizeDifference = maxSize - minSize;
+            
             statsDiv.innerHTML = `
                 <h3>📊 Team Formation Statistics</h3>
                 <div class="stat-grid">
@@ -804,12 +892,16 @@
                         <div class="stat-label">Total Players</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-value">${teamStats.avgExperience}</div>
-                        <div class="stat-label">Avg Experience</div>
+                        <div class="stat-value">${teamSizes.join(', ')}</div>
+                        <div class="stat-label">Team Sizes</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-value">${teamStats.experienceVariance}</div>
-                        <div class="stat-label">Experience Variance</div>
+                        <div class="stat-value">${sizeDifference}</div>
+                        <div class="stat-label">Size Difference</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${teamStats.avgExperience}</div>
+                        <div class="stat-label">Avg Experience</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-value">${teamStats.teamsWithGoalkeepers}</div>
@@ -822,6 +914,10 @@
                     <div class="stat-item">
                         <div class="stat-value">${teamStats.reciprocalPairs}</div>
                         <div class="stat-label">Reciprocal Pairs Honored</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${teamStats.experienceVariance}</div>
+                        <div class="stat-label">Experience Variance</div>
                     </div>
                 </div>
             `;
@@ -860,7 +956,6 @@
 
         // Download functionality
         document.getElementById('downloadTeams').addEventListener('click', downloadTeamsCSV);
-        document.getElementById('downloadStats').addEventListener('click', downloadStatsCSV);
 
         function downloadTeamsCSV() {
             const csvData = [];
@@ -880,34 +975,6 @@
             });
 
             downloadCSV(csvData, 'teams.csv');
-        }
-
-        function downloadStatsCSV() {
-            const csvData = [];
-            csvData.push(['Metric', 'Value']);
-            csvData.push(['Total Players', teamStats.totalPlayers]);
-            csvData.push(['Average Experience', teamStats.avgExperience]);
-            csvData.push(['Experience Variance', teamStats.experienceVariance]);
-            csvData.push(['Teams with Goalkeepers', teamStats.teamsWithGoalkeepers]);
-            csvData.push(['Teams with Team Reps', teamStats.teamsWithTRs]);
-            csvData.push(['Reciprocal Pairs Honored', teamStats.reciprocalPairs]);
-            
-            csvData.push(['', '']); // Empty row
-            csvData.push(['Team', 'Players', 'Avg Experience', 'Goalkeepers', 'Team Reps']);
-            
-            generatedTeams.forEach(team => {
-                const avgExp = team.players.length > 0 ? 
-                    (team.totalExperience / team.players.length).toFixed(2) : '0.00';
-                csvData.push([
-                    team.name,
-                    team.players.length,
-                    avgExp,
-                    team.goalkeepers,
-                    team.teamReps
-                ]);
-            });
-
-            downloadCSV(csvData, 'team_statistics.csv');
         }
 
         function downloadCSV(data, filename) {
