@@ -447,31 +447,31 @@
 
             let remainingPlayers = [...players];
 
-            // Priority 2: Distribute goalkeepers first
+            // Priority 2: Distribute goalkeepers - at least one per team when possible
             const goalkeepers = remainingPlayers.filter(p => 
                 p.position.toLowerCase().includes('keeper')
             );
             
-            const gkDistribution = calculateDistribution(goalkeepers.length, teamCount);
             goalkeepers.forEach((gk) => {
-                // Find teams that still need goalkeepers (haven't reached their target)
-                let bestTeamIndex = -1;
-                for (let i = 0; i < teams.length; i++) {
-                    if (teams[i].goalkeepers < gkDistribution[i] && teams[i].players.length < teams[i].targetSize) {
-                        bestTeamIndex = i;
-                        break;
+                // Find teams that don't have a goalkeeper yet
+                const teamsNeedingGK = teams.filter((team, index) => 
+                    team.goalkeepers === 0 && team.players.length < team.targetSize
+                );
+                
+                if (teamsNeedingGK.length > 0) {
+                    // Assign to the smallest team that needs a GK
+                    teamsNeedingGK.sort((a, b) => a.players.length - b.players.length);
+                    const targetTeam = teamsNeedingGK[0];
+                    const teamIndex = teams.indexOf(targetTeam);
+                    addPlayerToTeam(teams[teamIndex], gk);
+                } else {
+                    // All teams have GKs, assign to smallest team
+                    const teamIndex = findSmallestTeam(teams);
+                    if (teamIndex !== -1) {
+                        addPlayerToTeam(teams[teamIndex], gk);
                     }
                 }
-                
-                // Fallback to smallest team if no team specifically needs goalkeepers
-                if (bestTeamIndex === -1) {
-                    bestTeamIndex = findSmallestTeam(teams);
-                }
-                
-                if (bestTeamIndex !== -1) {
-                    addPlayerToTeam(teams[bestTeamIndex], gk);
-                    remainingPlayers = remainingPlayers.filter(p => p.name !== gk.name);
-                }
+                remainingPlayers = remainingPlayers.filter(p => p.name !== gk.name);
             });
 
             // Priority 3: Handle reciprocal pairs
@@ -487,7 +487,32 @@
                 }
             });
 
-            // Priority 4: Handle one-way requests
+            // Priority 4: Distribute TRs - at least one per team when possible
+            const teamReps = remainingPlayers.filter(p => p.isTR);
+            
+            teamReps.forEach((tr) => {
+                // Find teams that don't have a TR yet
+                const teamsNeedingTR = teams.filter((team, index) => 
+                    team.teamReps === 0 && team.players.length < team.targetSize
+                );
+                
+                if (teamsNeedingTR.length > 0) {
+                    // Assign to the smallest team that needs a TR
+                    teamsNeedingTR.sort((a, b) => a.players.length - b.players.length);
+                    const targetTeam = teamsNeedingTR[0];
+                    const teamIndex = teams.indexOf(targetTeam);
+                    addPlayerToTeam(teams[teamIndex], tr);
+                } else {
+                    // All teams have TRs, assign to smallest team
+                    const teamIndex = findSmallestTeam(teams);
+                    if (teamIndex !== -1) {
+                        addPlayerToTeam(teams[teamIndex], tr);
+                    }
+                }
+                remainingPlayers = remainingPlayers.filter(p => p.name !== tr.name);
+            });
+
+            // Priority 5: Handle one-way requests
             const playersWithRequests = remainingPlayers.filter(p => p.requests.length > 0);
             playersWithRequests.forEach(player => {
                 const teamIndex = findTeamForRequest(teams, player);
@@ -497,33 +522,7 @@
                 }
             });
 
-            // Priority 5: Distribute TRs
-            const teamReps = remainingPlayers.filter(p => p.isTR);
-            const trDistribution = calculateDistribution(teamReps.length, teamCount);
-            
-            teamReps.forEach((tr) => {
-                // Find teams that still need TRs (haven't reached their target)
-                let bestTeamIndex = -1;
-                for (let i = 0; i < teams.length; i++) {
-                    if (teams[i].teamReps < trDistribution[i] && teams[i].players.length < teams[i].targetSize) {
-                        bestTeamIndex = i;
-                        break;
-                    }
-                }
-                
-                // Fallback to smallest team if no team specifically needs TRs
-                if (bestTeamIndex === -1) {
-                    bestTeamIndex = findSmallestTeam(teams);
-                }
-                
-                if (bestTeamIndex !== -1) {
-                    addPlayerToTeam(teams[bestTeamIndex], tr);
-                    remainingPlayers = remainingPlayers.filter(p => p.name !== tr.name);
-                }
-            });
-
-            // Priority 6: Distribute remaining players by experience
-            remainingPlayers.sort((a, b) => b.experience - a.experience);
+            // Priority 6: Fill remaining spots
             remainingPlayers.forEach(player => {
                 const teamIndex = findSmallestTeam(teams);
                 if (teamIndex !== -1) {
@@ -558,17 +557,6 @@
             }
             
             return distribution;
-        }
-
-        function assignToTeamByDistribution(teams, distribution, property) {
-            for (let i = 0; i < teams.length; i++) {
-                if (teams[i][property] < distribution[i] && teams[i].players.length < teams[i].targetSize) {
-                    return i;
-                }
-            }
-            
-            // Fallback to smallest team
-            return findSmallestTeam(teams);
         }
 
         function findReciprocalPairs(players) {
