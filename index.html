@@ -217,24 +217,20 @@
             font-weight: 500;
         }
 
-        .teams-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 25px;
+        .teams-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
             margin-bottom: 30px;
         }
 
-        .team-card {
+        .team-row {
             background: white;
             border: 1px solid #e2e8f0;
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-        }
-
-        .team-card:hover {
-            transform: translateY(-5px);
+            width: 100%;
         }
 
         .team-header {
@@ -242,8 +238,19 @@
             color: white;
             padding: 20px;
             font-weight: 600;
-            text-align: center;
             font-size: 1.2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .team-name {
+            font-size: 1.3rem;
+        }
+
+        .team-stats {
+            font-size: 0.9rem;
+            opacity: 0.9;
         }
 
         .team-content {
@@ -252,18 +259,36 @@
 
         .player-list {
             list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
         }
 
         .player-item {
-            padding: 12px 0;
-            border-bottom: 1px solid #f7fafc;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            transition: background-color 0.2s ease;
         }
 
-        .player-item:last-child {
-            border-bottom: none;
+        .player-item:hover {
+            background: #edf2f7;
+        }
+
+        .player-name {
+            font-weight: 600;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+
+        .player-details {
+            font-size: 0.85rem;
+            color: #718096;
+            line-height: 1.4;
         }
 
         .player-name {
@@ -358,7 +383,13 @@
                 grid-template-columns: 1fr;
             }
             
-            .teams-grid {
+            .teams-container {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .player-list {
                 grid-template-columns: 1fr;
             }
             
@@ -426,7 +457,7 @@
                 <div style="margin-bottom: 30px;">
                     <button id="downloadTeams" class="download-btn">📥 Download Teams CSV</button>
                 </div>
-                <div id="teamsDisplay" class="teams-grid"></div>
+                <div id="teamsDisplay" class="teams-container"></div>
             </div>
         </div>
     </div>
@@ -848,11 +879,48 @@
                 remainingPlayers = remainingPlayers.filter(p => p.name !== tr.name);
             });
 
-            // Priority 4: Handle one-way requests
-            const playersWithRequests = remainingPlayers.filter(p => p.requests.length > 0);
-            debugLog(`Processing ${playersWithRequests.length} players with one-way requests`);
+            // Priority 4: Handle one-way request pairs/groups
+            const oneWayGroups = findOneWayRequestGroups(remainingPlayers);
+            debugLog(`Found ${oneWayGroups.length} one-way request groups:`, 
+                oneWayGroups.map(g => g.map(p => p.name)));
             
-            playersWithRequests.forEach(player => {
+            oneWayGroups.forEach((group, index) => {
+                debugLog(`Processing one-way group ${index + 1} of size ${group.length}:`, 
+                    group.map(p => p.name));
+                
+                const teamIndex = findTeamForGroup(teams, group);
+                
+                if (teamIndex !== -1) {
+                    debugLog(`Placing one-way group on Team ${teamIndex + 1}`);
+                    group.forEach(player => {
+                        addPlayerToTeam(teams[teamIndex], player);
+                        remainingPlayers = remainingPlayers.filter(p => p.name !== player.name);
+                    });
+                } else {
+                    // Group doesn't fit together, try to honor at least some requests
+                    debugLog(`One-way group of ${group.length} doesn't fit together, splitting...`);
+                    const subGroups = splitGroupIntelligently(group);
+                    
+                    subGroups.forEach((subGroup, subIndex) => {
+                        const subTeamIndex = findTeamForGroup(teams, subGroup);
+                        if (subTeamIndex !== -1) {
+                            debugLog(`Placing one-way subgroup ${subIndex + 1} (${subGroup.length} players) on Team ${subTeamIndex + 1}`);
+                            subGroup.forEach(player => {
+                                addPlayerToTeam(teams[subTeamIndex], player);
+                                remainingPlayers = remainingPlayers.filter(p => p.name !== player.name);
+                            });
+                        } else {
+                            warnings.push(`Could not honor requests for: ${subGroup.map(p => p.name).join(', ')}`);
+                        }
+                    });
+                }
+            });
+
+            // Priority 5: Handle remaining individual requests
+            const playersWithUnmetRequests = remainingPlayers.filter(p => p.requests.length > 0);
+            debugLog(`Processing ${playersWithUnmetRequests.length} players with remaining individual requests`);
+            
+            playersWithUnmetRequests.forEach(player => {
                 const teamIndex = findTeamForPlayerWithRequests(teams, player, remainingPlayers);
                 if (teamIndex !== -1) {
                     addPlayerToTeam(teams[teamIndex], player);
@@ -860,7 +928,7 @@
                 }
             });
 
-            // Priority 5: Fill remaining spots with remaining players
+            // Priority 6: Fill remaining spots with remaining players
             remainingPlayers.forEach(player => {
                 const teamIndex = findSmallestTeam(teams);
                 if (teamIndex !== -1) {
@@ -873,7 +941,76 @@
             return teams;
         }
 
-        function findReciprocalGroups(players) {
+        function findOneWayRequestGroups(players) {
+            const groups = [];
+            const used = new Set();
+
+            players.forEach(player => {
+                if (used.has(player.name) || player.requests.length === 0) return;
+
+                // Start a new group with this player
+                const group = [player];
+                used.add(player.name);
+
+                // Find players that this player requests (and aren't already used)
+                player.requests.forEach(requestName => {
+                    const requestedPlayer = players.find(p => 
+                        !used.has(p.name) && matchesName(p.name, requestName)
+                    );
+                    
+                    if (requestedPlayer) {
+                        group.push(requestedPlayer);
+                        used.add(requestedPlayer.name);
+                    }
+                });
+
+                // Find players that request this player (and aren't already used)
+                players.forEach(otherPlayer => {
+                    if (used.has(otherPlayer.name) || otherPlayer === player) return;
+                    
+                    const requestsThisPlayer = otherPlayer.requests.some(req => 
+                        matchesName(player.name, req)
+                    );
+                    
+                    if (requestsThisPlayer) {
+                        group.push(otherPlayer);
+                        used.add(otherPlayer.name);
+                    }
+                });
+
+                // Add transitively connected players (friends of friends)
+                let foundNew = true;
+                while (foundNew && group.length < 4) { // Limit group size to prevent huge chains
+                    foundNew = false;
+                    
+                    for (const groupPlayer of group) {
+                        for (const requestName of groupPlayer.requests) {
+                            const requestedPlayer = players.find(p => 
+                                !used.has(p.name) && matchesName(p.name, requestName)
+                            );
+                            
+                            if (requestedPlayer) {
+                                group.push(requestedPlayer);
+                                used.add(requestedPlayer.name);
+                                foundNew = true;
+                                break;
+                            }
+                        }
+                        if (foundNew) break;
+                    }
+                }
+
+                // Only add groups of 2+ players
+                if (group.length >= 2) {
+                    groups.push(group);
+                } else {
+                    // If no group formed, remove from used set so player can be handled individually
+                    used.delete(player.name);
+                }
+            });
+
+            return groups;
+        }
             const groups = [];
             const used = new Set();
 
@@ -955,6 +1092,7 @@
         }
 
         function findTeamForPlayerWithRequests(teams, player, remainingPlayers) {
+            // First, try to find a team with already-placed requested players
             for (let i = 0; i < teams.length; i++) {
                 if (teams[i].players.length >= teams[i].targetSize) continue;
                 
@@ -967,6 +1105,30 @@
                 }
             }
             
+            // Second, try to find a team where we can place both this player and a requested player
+            for (const requestName of player.requests) {
+                const requestedPlayer = remainingPlayers.find(p => 
+                    matchesName(p.name, requestName)
+                );
+                
+                if (requestedPlayer) {
+                    // Find a team that can fit both players
+                    for (let i = 0; i < teams.length; i++) {
+                        if (teams[i].players.length + 2 <= teams[i].targetSize) {
+                            // Place the requested player first, then return this team for the requesting player
+                            addPlayerToTeam(teams[i], requestedPlayer);
+                            // Remove from remaining players
+                            const index = remainingPlayers.indexOf(requestedPlayer);
+                            if (index > -1) {
+                                remainingPlayers.splice(index, 1);
+                            }
+                            return i;
+                        }
+                    }
+                }
+            }
+            
+            // If no requested players can be accommodated, find smallest available team
             return findSmallestTeam(teams);
         }
 
@@ -1091,24 +1253,37 @@
 
         function displayTeams(teams) {
             const teamsHtml = teams.map(team => {
+                // Calculate team stats
+                const goalkeepers = team.players.filter(p => p.position.toLowerCase().includes('keeper')).length;
+                const teamReps = team.players.filter(p => p.isTR).length;
+                const avgExperience = (team.players.reduce((sum, p) => sum + p.experience, 0) / team.players.length).toFixed(1);
+                
                 const playersHtml = team.players.map(player => `
                     <li class="player-item">
-                        <span class="player-name">
+                        <div class="player-name">
                             ${player.name}
-                            ${player.position.toLowerCase().includes('keeper') ? ' 🥅' : ''}
-                            ${player.isTR ? ' 👨‍💼' : ''}
-                        </span>
-                        <span class="player-details">
-                            Exp: ${player.experience} | Pos: ${player.position}
-                            ${player.requests.length > 0 ? ` | Requests: ${player.requests.join(', ')}` : ''}
-                        </span>
+                            ${player.position.toLowerCase().includes('keeper') ? '<span title="Goalkeeper">🥅</span>' : ''}
+                            ${player.isTR ? '<span title="Team Representative">👨‍💼</span>' : ''}
+                        </div>
+                        <div class="player-details">
+                            <strong>Position:</strong> ${player.position} | 
+                            <strong>Experience:</strong> ${player.experience}
+                            ${player.missedGames > 0 ? ` | <strong>Missed Games:</strong> ${player.missedGames}` : ''}
+                            ${player.requests.length > 0 ? `<br><strong>Requests:</strong> ${player.requests.join(', ')}` : ''}
+                        </div>
                     </li>
                 `).join('');
 
                 return `
-                    <div class="team-card">
+                    <div class="team-row">
                         <div class="team-header">
-                            ${team.name} (${team.players.length} players)
+                            <div class="team-name">${team.name}</div>
+                            <div class="team-stats">
+                                ${team.players.length} players | 
+                                ${goalkeepers} GK | 
+                                ${teamReps} TR | 
+                                Avg Exp: ${avgExperience}
+                            </div>
                         </div>
                         <div class="team-content">
                             <ul class="player-list">
