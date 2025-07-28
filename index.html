@@ -311,12 +311,31 @@
 
         function parseCSV(file) {
             Papa.parse(file, {
-                header: true,
+                header: false, // Don't treat first row as header
                 skipEmptyLines: true,
                 dynamicTyping: true,
                 complete: function(results) {
                     try {
-                        processPlayerData(results.data);
+                        // Skip the first row (tallies) and use second row as headers
+                        if (results.data.length < 2) {
+                            throw new Error('CSV must have at least 2 rows (headers and data)');
+                        }
+                        
+                        const headers = results.data[1]; // Second row contains headers
+                        const dataRows = results.data.slice(2); // Data starts from third row
+                        
+                        // Convert to objects using headers
+                        const objectData = dataRows.map(row => {
+                            const obj = {};
+                            headers.forEach((header, index) => {
+                                if (header) { // Only if header exists
+                                    obj[header] = row[index];
+                                }
+                            });
+                            return obj;
+                        });
+                        
+                        processPlayerData(objectData);
                         populateDivisions();
                         document.getElementById('generateTeams').disabled = false;
                         hideError();
