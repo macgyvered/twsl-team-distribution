@@ -217,14 +217,14 @@
             font-weight: 500;
         }
 
-        .teams-container {
+        .teams-grid {
             display: flex;
             flex-direction: column;
             gap: 20px;
             margin-bottom: 30px;
         }
 
-        .team-row {
+        .team-card {
             background: white;
             border: 1px solid #e2e8f0;
             border-radius: 12px;
@@ -238,19 +238,8 @@
             color: white;
             padding: 20px;
             font-weight: 600;
+            text-align: center;
             font-size: 1.2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .team-name {
-            font-size: 1.3rem;
-        }
-
-        .team-stats {
-            font-size: 0.9rem;
-            opacity: 0.9;
         }
 
         .team-content {
@@ -259,36 +248,28 @@
 
         .player-list {
             list-style: none;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 15px;
         }
 
         .player-item {
-            background: #f7fafc;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            transition: background-color 0.2s ease;
+            padding: 12px 0;
+            border-bottom: 1px solid #f7fafc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .player-item:hover {
-            background: #edf2f7;
+        .player-item:last-child {
+            border-bottom: none;
         }
 
         .player-name {
-            font-weight: 600;
+            font-weight: 500;
             color: #2d3748;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 5px;
         }
 
         .player-details {
             font-size: 0.85rem;
             color: #718096;
-            line-height: 1.4;
         }
 
         .player-name {
@@ -383,14 +364,8 @@
                 grid-template-columns: 1fr;
             }
             
-            .teams-container {
-                display: flex;
+            .teams-grid {
                 flex-direction: column;
-                gap: 15px;
-            }
-            
-            .player-list {
-                grid-template-columns: 1fr;
             }
             
             .stat-grid {
@@ -457,7 +432,7 @@
                 <div style="margin-bottom: 30px;">
                     <button id="downloadTeams" class="download-btn">📥 Download Teams CSV</button>
                 </div>
-                <div id="teamsDisplay" class="teams-container"></div>
+                <div id="teamsDisplay" class="teams-grid"></div>
             </div>
         </div>
     </div>
@@ -1253,37 +1228,24 @@
 
         function displayTeams(teams) {
             const teamsHtml = teams.map(team => {
-                // Calculate team stats
-                const goalkeepers = team.players.filter(p => p.position.toLowerCase().includes('keeper')).length;
-                const teamReps = team.players.filter(p => p.isTR).length;
-                const avgExperience = (team.players.reduce((sum, p) => sum + p.experience, 0) / team.players.length).toFixed(1);
-                
                 const playersHtml = team.players.map(player => `
                     <li class="player-item">
-                        <div class="player-name">
+                        <span class="player-name">
                             ${player.name}
-                            ${player.position.toLowerCase().includes('keeper') ? '<span title="Goalkeeper">🥅</span>' : ''}
-                            ${player.isTR ? '<span title="Team Representative">👨‍💼</span>' : ''}
-                        </div>
-                        <div class="player-details">
-                            <strong>Position:</strong> ${player.position} | 
-                            <strong>Experience:</strong> ${player.experience}
-                            ${player.missedGames > 0 ? ` | <strong>Missed Games:</strong> ${player.missedGames}` : ''}
-                            ${player.requests.length > 0 ? `<br><strong>Requests:</strong> ${player.requests.join(', ')}` : ''}
-                        </div>
+                            ${player.position.toLowerCase().includes('keeper') ? ' 🥅' : ''}
+                            ${player.isTR ? ' 👨‍💼' : ''}
+                        </span>
+                        <span class="player-details">
+                            Exp: ${player.experience} | Pos: ${player.position}
+                            ${player.requests.length > 0 ? ` | Requests: ${player.requests.join(', ')}` : ''}
+                        </span>
                     </li>
                 `).join('');
 
                 return `
-                    <div class="team-row">
+                    <div class="team-card">
                         <div class="team-header">
-                            <div class="team-name">${team.name}</div>
-                            <div class="team-stats">
-                                ${team.players.length} players | 
-                                ${goalkeepers} GK | 
-                                ${teamReps} TR | 
-                                Avg Exp: ${avgExperience}
-                            </div>
+                            ${team.name} (${team.players.length} players)
                         </div>
                         <div class="team-content">
                             <ul class="player-list">
