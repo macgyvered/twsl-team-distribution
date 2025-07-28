@@ -719,18 +719,8 @@
                 }
             });
 
-            // Convert groups to pairs format for compatibility with existing code
-            const pairs = [];
-            groups.forEach(group => {
-                if (group.length === 2) {
-                    pairs.push([group[0], group[1]]);
-                } else if (group.length >= 3) {
-                    // For groups of 3+, create a special "group" pair that contains all members
-                    pairs.push(group);
-                }
-            });
-
-            return pairs;
+            // Return groups directly - no conversion needed
+            return groups;
         }
 
         function matchesName(fullName, requestName) {
