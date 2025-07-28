@@ -365,64 +365,30 @@
 
         function parseCSV(file) {
             Papa.parse(file, {
-                header: false,
+                header: true,  // Parse first row as headers
                 skipEmptyLines: true,
                 dynamicTyping: true,
+                delimitersToGuess: [',', '\t', '|', ';'],
                 complete: function(results) {
                     try {
-                        debugLog('Raw CSV data rows:', results.data.length);
+                        debugLog('CSV parsed successfully');
+                        debugLog('Number of rows:', results.data.length);
+                        debugLog('Headers:', results.meta.fields);
                         
-                        if (results.data.length < 2) {
-                            throw new Error('CSV must have at least 2 rows');
+                        if (results.data.length === 0) {
+                            throw new Error('No data rows found in CSV');
                         }
                         
-                        // Detect where headers are - look for row with "Full Name"
-                        let headerRowIndex = -1;
-                        for (let i = 0; i < Math.min(results.data.length, 5); i++) {
-                            if (results.data[i].some(cell => 
-                                cell && cell.toString().includes('Full Name')
-                            )) {
-                                headerRowIndex = i;
-                                break;
-                            }
+                        // Log sample data
+                        if (results.data.length > 0) {
+                            debugLog('First player data:', results.data[0]);
                         }
                         
-                        if (headerRowIndex === -1) {
-                            throw new Error('Could not find header row with "Full Name" column');
-                        }
-                        
-                        debugLog('Found headers at row:', headerRowIndex);
-                        
-                        const headers = results.data[headerRowIndex];
-                        const dataRows = results.data.slice(headerRowIndex + 1);
-                        
-                        debugLog('Headers:', headers);
-                        debugLog('Data rows:', dataRows.length);
-                        
-                        // Convert to objects using headers
-                        const objectData = dataRows.map((row, index) => {
-                            const obj = {};
-                            headers.forEach((header, colIndex) => {
-                                if (header && typeof header === 'string') {
-                                    // Clean up header names
-                                    const cleanHeader = header.trim();
-                                    if (cleanHeader) {
-                                        obj[cleanHeader] = row[colIndex];
-                                    }
-                                }
-                            });
-                            return obj;
-                        }).filter(obj => Object.keys(obj).length > 0); // Remove empty rows
-                        
-                        debugLog('Parsed player objects:', objectData.length);
-                        if (objectData.length > 0) {
-                            debugLog('Sample player:', objectData[0]);
-                        }
-                        
-                        processPlayerData(objectData);
+                        processPlayerData(results.data);
                         populateDivisions();
                         document.getElementById('generateTeams').disabled = false;
                         hideError();
+                        document.getElementById('fileInfo').textContent = `✓ Loaded ${playerData.length} players`;
                     } catch (error) {
                         showError('Error processing CSV: ' + error.message);
                         console.error('CSV Parse Error:', error);
