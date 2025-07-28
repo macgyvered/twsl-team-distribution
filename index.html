@@ -239,6 +239,35 @@
             display: none;
         }
 
+        .debug-section {
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .debug-section.show {
+            display: block;
+        }
+
+        .debug-section h4 {
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .debug-content {
+            font-family: monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
         @media (max-width: 768px) {
             .controls {
                 grid-template-columns: 1fr;
@@ -285,6 +314,11 @@
                 <ul id="warningsList"></ul>
             </div>
 
+            <div id="debug" class="debug-section">
+                <h4>🔍 Debug Information</h4>
+                <div class="debug-content" id="debugContent"></div>
+            </div>
+
             <div id="results" class="results">
                 <div id="stats" class="stats"></div>
                 <div style="margin-bottom: 30px;">
@@ -299,6 +333,26 @@
         let playerData = [];
         let availableDivisions = [];
         let generatedTeams = [];
+        let debugMode = true; // Enable debug logging
+
+        // Debug logging function
+        function debugLog(message, data = null) {
+            if (!debugMode) return;
+            
+            const debugContent = document.getElementById('debugContent');
+            const debugSection = document.getElementById('debug');
+            debugSection.classList.add('show');
+            
+            const timestamp = new Date().toLocaleTimeString();
+            let logMessage = `[${timestamp}] ${message}`;
+            
+            if (data !== null) {
+                logMessage += '\n' + JSON.stringify(data, null, 2);
+            }
+            
+            debugContent.textContent += logMessage + '\n\n';
+            console.log(message, data);
+        }
 
         // File upload
         document.getElementById('csvFile').addEventListener('change', function(e) {
@@ -311,24 +365,22 @@
 
         function parseCSV(file) {
             Papa.parse(file, {
-                header: false, // Don't treat first row as header
+                header: false,
                 skipEmptyLines: true,
                 dynamicTyping: true,
                 complete: function(results) {
                     try {
-                        // Skip the first row (tallies) and use second row as headers
                         if (results.data.length < 2) {
                             throw new Error('CSV must have at least 2 rows (headers and data)');
                         }
                         
-                        const headers = results.data[1]; // Second row contains headers
-                        const dataRows = results.data.slice(2); // Data starts from third row
+                        const headers = results.data[1];
+                        const dataRows = results.data.slice(2);
                         
-                        // Convert to objects using headers
                         const objectData = dataRows.map(row => {
                             const obj = {};
                             headers.forEach((header, index) => {
-                                if (header) { // Only if header exists
+                                if (header) {
                                     obj[header] = row[index];
                                 }
                             });
@@ -394,6 +446,9 @@
                 return;
             }
 
+            // Clear debug log
+            document.getElementById('debugContent').textContent = '';
+            
             try {
                 const divisionPlayers = getDivisionPlayers(division);
                 if (divisionPlayers.length === 0) {
@@ -433,7 +488,6 @@
             const requests = [];
             let requestColumns = [];
             
-            // Get the right request columns based on division
             if (division === 'Open Division') {
                 requestColumns = ['(Open Division) Requests', '(Open Division) Requests 2', '(Open Division) Requests 3'];
             } else if (division === 'Over 30 Division') {
@@ -456,8 +510,11 @@
         }
 
         function balanceTeams(players, teamCount) {
-            // Priority 1: Calculate target team sizes
+            const warnings = [];
+            
+            // Calculate target team sizes
             const targetSizes = calculateTeamSizes(players.length, teamCount);
+            debugLog('Target team sizes:', targetSizes);
             
             // Initialize teams
             const teams = Array.from({ length: teamCount }, (_, i) => ({
@@ -471,25 +528,61 @@
 
             let remainingPlayers = [...players];
 
-            // Priority 2: Distribute goalkeepers - at least one per team when possible
+            // Priority 1: Find and place reciprocal groups
+            const reciprocalGroups = findReciprocalGroups(remainingPlayers);
+            debugLog(`Found ${reciprocalGroups.length} reciprocal groups:`, 
+                reciprocalGroups.map(g => g.map(p => p.name)));
+            
+            reciprocalGroups.forEach((group, index) => {
+                debugLog(`Processing reciprocal group ${index + 1} of size ${group.length}:`, 
+                    group.map(p => p.name));
+                
+                // Try to place the entire group together
+                const teamIndex = findTeamForGroup(teams, group);
+                
+                if (teamIndex !== -1) {
+                    debugLog(`Placing entire group on Team ${teamIndex + 1}`);
+                    group.forEach(player => {
+                        addPlayerToTeam(teams[teamIndex], player);
+                        remainingPlayers = remainingPlayers.filter(p => p.name !== player.name);
+                    });
+                } else {
+                    // Group doesn't fit together, need to split
+                    debugLog(`Group of ${group.length} doesn't fit together, splitting...`);
+                    const subGroups = splitGroupIntelligently(group);
+                    
+                    subGroups.forEach((subGroup, subIndex) => {
+                        const subTeamIndex = findTeamForGroup(teams, subGroup);
+                        if (subTeamIndex !== -1) {
+                            debugLog(`Placing subgroup ${subIndex + 1} (${subGroup.length} players) on Team ${subTeamIndex + 1}`);
+                            subGroup.forEach(player => {
+                                addPlayerToTeam(teams[subTeamIndex], player);
+                                remainingPlayers = remainingPlayers.filter(p => p.name !== player.name);
+                            });
+                        } else {
+                            warnings.push(`Could not keep subgroup together: ${subGroup.map(p => p.name).join(', ')}`);
+                        }
+                    });
+                }
+            });
+
+            // Priority 2: Distribute goalkeepers
             const goalkeepers = remainingPlayers.filter(p => 
                 p.position.toLowerCase().includes('keeper')
             );
+            debugLog(`Distributing ${goalkeepers.length} goalkeepers`);
             
             goalkeepers.forEach((gk) => {
-                // Find teams that don't have a goalkeeper yet
-                const teamsNeedingGK = teams.filter((team, index) => 
+                const teamsNeedingGK = teams.filter(team => 
                     team.goalkeepers === 0 && team.players.length < team.targetSize
                 );
                 
                 if (teamsNeedingGK.length > 0) {
-                    // Assign to the smallest team that needs a GK
                     teamsNeedingGK.sort((a, b) => a.players.length - b.players.length);
                     const targetTeam = teamsNeedingGK[0];
                     const teamIndex = teams.indexOf(targetTeam);
                     addPlayerToTeam(teams[teamIndex], gk);
                 } else {
-                    // All teams have GKs, assign to smallest team
                     const teamIndex = findSmallestTeam(teams);
                     if (teamIndex !== -1) {
                         addPlayerToTeam(teams[teamIndex], gk);
@@ -498,36 +591,21 @@
                 remainingPlayers = remainingPlayers.filter(p => p.name !== gk.name);
             });
 
-            // Priority 3: Handle reciprocal pairs
-            const reciprocalPairs = findReciprocalPairs(remainingPlayers);
-            reciprocalPairs.forEach(pair => {
-                const teamIndex = findBestTeamForPair(teams, pair);
-                if (teamIndex !== -1) {
-                    addPlayerToTeam(teams[teamIndex], pair[0]);
-                    addPlayerToTeam(teams[teamIndex], pair[1]);
-                    remainingPlayers = remainingPlayers.filter(p => 
-                        p.name !== pair[0].name && p.name !== pair[1].name
-                    );
-                }
-            });
-
-            // Priority 4: Distribute TRs - at least one per team when possible
+            // Priority 3: Distribute Team Reps
             const teamReps = remainingPlayers.filter(p => p.isTR);
+            debugLog(`Distributing ${teamReps.length} team reps`);
             
             teamReps.forEach((tr) => {
-                // Find teams that don't have a TR yet
-                const teamsNeedingTR = teams.filter((team, index) => 
+                const teamsNeedingTR = teams.filter(team => 
                     team.teamReps === 0 && team.players.length < team.targetSize
                 );
                 
                 if (teamsNeedingTR.length > 0) {
-                    // Assign to the smallest team that needs a TR
                     teamsNeedingTR.sort((a, b) => a.players.length - b.players.length);
                     const targetTeam = teamsNeedingTR[0];
                     const teamIndex = teams.indexOf(targetTeam);
                     addPlayerToTeam(teams[teamIndex], tr);
                 } else {
-                    // All teams have TRs, assign to smallest team
                     const teamIndex = findSmallestTeam(teams);
                     if (teamIndex !== -1) {
                         addPlayerToTeam(teams[teamIndex], tr);
@@ -536,243 +614,124 @@
                 remainingPlayers = remainingPlayers.filter(p => p.name !== tr.name);
             });
 
-            // Priority 5: Handle one-way requests with fair group formation
+            // Priority 4: Handle one-way requests
             const playersWithRequests = remainingPlayers.filter(p => p.requests.length > 0);
-            const processedPlayers = new Set();
-            const groups = [];
+            debugLog(`Processing ${playersWithRequests.length} players with one-way requests`);
             
-            // Step 1: Prioritize players with single requests first
-            const singleRequestPlayers = playersWithRequests.filter(p => p.requests.length === 1);
-            const multiRequestPlayers = playersWithRequests.filter(p => p.requests.length > 1);
-            
-            // Process single requests first to ensure they get honored
-            singleRequestPlayers.forEach(player => {
-                if (processedPlayers.has(player.name)) return;
-                
-                const requestedName = player.requests[0];
-                const requestedPlayer = remainingPlayers.find(p => 
-                    !processedPlayers.has(p.name) && matchesName(p.name, requestedName)
-                );
-                
-                if (requestedPlayer) {
-                    const group = [player, requestedPlayer];
-                    groups.push(group);
-                    processedPlayers.add(player.name);
-                    processedPlayers.add(requestedPlayer.name);
-                }
-            });
-            
-            // Step 2: Handle multi-request players fairly
-            multiRequestPlayers.forEach(player => {
-                if (processedPlayers.has(player.name)) return;
-                
-                const group = [player];
-                processedPlayers.add(player.name);
-                
-                // Try to add requested players (up to 3 more for max group of 4)
-                for (const requestName of player.requests) {
-                    if (group.length >= 4) break; // Max group size of 4
-                    
-                    const requestedPlayer = remainingPlayers.find(p => 
-                        !processedPlayers.has(p.name) && matchesName(p.name, requestName)
-                    );
-                    
-                    if (requestedPlayer) {
-                        group.push(requestedPlayer);
-                        processedPlayers.add(requestedPlayer.name);
-                    }
-                }
-                
-                if (group.length > 1) {
-                    groups.push(group);
-                }
-            });
-            
-            // Step 3: Place groups on teams
-            groups.forEach(group => {
-                const teamIndex = findTeamForGroup(teams, group);
+            playersWithRequests.forEach(player => {
+                const teamIndex = findTeamForPlayerWithRequests(teams, player, remainingPlayers);
                 if (teamIndex !== -1) {
-                    // Place entire group together
-                    group.forEach(groupPlayer => {
-                        addPlayerToTeam(teams[teamIndex], groupPlayer);
-                        remainingPlayers = remainingPlayers.filter(p => p.name !== groupPlayer.name);
-                    });
-                } else {
-                    // Group doesn't fit anywhere, try to split fairly
-                    const splitGroups = splitGroupFairly(group);
-                    splitGroups.forEach(subGroup => {
-                        const subTeamIndex = findTeamForGroup(teams, subGroup);
-                        if (subTeamIndex !== -1) {
-                            subGroup.forEach(groupPlayer => {
-                                addPlayerToTeam(teams[subTeamIndex], groupPlayer);
-                                remainingPlayers = remainingPlayers.filter(p => p.name !== groupPlayer.name);
-                            });
-                        } else {
-                            // Place individually if even subgroups don't fit
-                            subGroup.forEach(groupPlayer => {
-                                const individualTeamIndex = findSmallestTeam(teams);
-                                if (individualTeamIndex !== -1) {
-                                    addPlayerToTeam(teams[individualTeamIndex], groupPlayer);
-                                    remainingPlayers = remainingPlayers.filter(p => p.name !== groupPlayer.name);
-                                }
-                            });
-                        }
-                    });
+                    addPlayerToTeam(teams[teamIndex], player);
+                    remainingPlayers = remainingPlayers.filter(p => p.name !== player.name);
                 }
             });
 
-            // Priority 6: Fill remaining spots
+            // Priority 5: Fill remaining spots with remaining players
             remainingPlayers.forEach(player => {
                 const teamIndex = findSmallestTeam(teams);
                 if (teamIndex !== -1) {
                     addPlayerToTeam(teams[teamIndex], player);
-                } else {
-                    // This should never happen with correct team size calculations
-                    // but handle it gracefully by forcing assignment
-                    const leastFullTeam = teams.reduce((min, team, index) => {
-                        return teams[min].players.length > team.players.length ? index : min;
-                    }, 0);
-                    addPlayerToTeam(teams[leastFullTeam], player, true);
-                    warnings.push(`Had to exceed target size to assign ${player.name}`);
                 }
             });
 
+            teams.warnings = warnings;
             return teams;
         }
 
-        function calculateTeamSizes(totalPlayers, numTeams) {
-            const baseSize = Math.floor(totalPlayers / numTeams);
-            const extras = totalPlayers % numTeams;
-            const sizes = Array(numTeams).fill(baseSize);
-            
-            for (let i = numTeams - extras; i < numTeams; i++) {
-                sizes[i]++;
-            }
-            
-            return sizes;
-        }
-
-        function calculateDistribution(totalItems, numTeams) {
-            if (totalItems === 0) return Array(numTeams).fill(0);
-            
-            const baseCount = Math.floor(totalItems / numTeams);
-            const extras = totalItems % numTeams;
-            const distribution = Array(numTeams).fill(baseCount);
-            
-            for (let i = numTeams - extras; i < numTeams; i++) {
-                distribution[i]++;
-            }
-            
-            return distribution;
-        }
-
-        function findReciprocalPairs(players) {
+        function findReciprocalGroups(players) {
             const groups = [];
             const used = new Set();
 
             players.forEach(player => {
-                if (used.has(player.name)) return;
+                if (used.has(player.name) || player.requests.length === 0) return;
 
-                // Start a potential group with this player
-                const potentialGroup = [player];
-                const toCheck = [player];
+                // Start with current player
+                const group = [player];
+                used.add(player.name);
 
-                // Recursively find all players who have mutual requests with the group
-                while (toCheck.length > 0) {
-                    const currentPlayer = toCheck.pop();
+                // Find all players that form a reciprocal group with current members
+                let foundNew = true;
+                while (foundNew && group.length < 4) {
+                    foundNew = false;
                     
-                    currentPlayer.requests.forEach(requestName => {
-                        const requestedPlayer = players.find(p => 
-                            !used.has(p.name) && 
-                            !potentialGroup.includes(p) &&
-                            matchesName(p.name, requestName)
+                    for (const p of players) {
+                        if (used.has(p.name) || group.includes(p)) continue;
+                        
+                        // Check if this player requests all current group members
+                        const requestsAllMembers = group.every(member =>
+                            p.requests.some(req => matchesName(member.name, req))
                         );
                         
-                        if (requestedPlayer) {
-                            // Check if requested player also requests current player
-                            if (requestedPlayer.requests.some(name => matchesName(currentPlayer.name, name))) {
-                                // Also check if requested player requests ALL other members of the group
-                                const requestsAllMembers = potentialGroup.every(member => 
-                                    member === currentPlayer || 
-                                    requestedPlayer.requests.some(name => matchesName(member.name, name))
-                                );
-                                
-                                // And check if all current group members request the new player
-                                const allMembersRequestNew = potentialGroup.every(member =>
-                                    member === currentPlayer ||
-                                    member.requests.some(name => matchesName(requestedPlayer.name, name))
-                                );
-                                
-                                if (requestsAllMembers && allMembersRequestNew && potentialGroup.length < 4) {
-                                    potentialGroup.push(requestedPlayer);
-                                    toCheck.push(requestedPlayer);
-                                }
-                            }
+                        // Check if all current group members request this player
+                        const allMembersRequestPlayer = group.every(member =>
+                            member.requests.some(req => matchesName(p.name, req))
+                        );
+                        
+                        if (requestsAllMembers && allMembersRequestPlayer) {
+                            group.push(p);
+                            used.add(p.name);
+                            foundNew = true;
+                            break;
                         }
-                    });
+                    }
                 }
 
-                // If we found a reciprocal group (2 or more players), add it
-                if (potentialGroup.length >= 2) {
-                    groups.push(potentialGroup);
-                    potentialGroup.forEach(p => used.add(p.name));
+                // Only add groups of 2+ where everyone requests everyone
+                if (group.length >= 2) {
+                    groups.push(group);
+                } else {
+                    // If no reciprocal group formed, remove from used set
+                    used.delete(player.name);
                 }
             });
 
-            // Return groups directly - no conversion needed
             return groups;
         }
 
-        function matchesName(fullName, requestName) {
-            // Exact match only to avoid confusion with similar names
-            return fullName.toLowerCase().trim() === requestName.toLowerCase().trim();
-        }
-
-        function findBestTeamForPair(teams, pair) {
-            const availableTeams = teams.filter(team => team.players.length + 2 <= team.targetSize);
-            if (availableTeams.length === 0) return -1;
+        function splitGroupIntelligently(group) {
+            if (group.length <= 2) return [group];
             
-            // Sort by current size (smallest first)
-            availableTeams.sort((a, b) => a.players.length - b.players.length);
-            return teams.indexOf(availableTeams[0]);
-        }
-
-        function splitGroupFairly(group) {
-            // If group is 4 or less, no need to split
-            if (group.length <= 4) {
-                return [group];
+            if (group.length === 3) {
+                // For group of 3, try to keep 2 together
+                // Could implement logic to choose which 2 based on other factors
+                return [
+                    [group[0], group[1]],
+                    [group[2]]
+                ];
             }
             
-            // For groups of 5+, try to split as evenly as possible
-            // Aim for groups of 2-3 players each
-            const subGroups = [];
-            const halfSize = Math.ceil(group.length / 2);
+            if (group.length === 4) {
+                // Split into two pairs
+                return [
+                    [group[0], group[1]],
+                    [group[2], group[3]]
+                ];
+            }
             
-            subGroups.push(group.slice(0, halfSize));
-            subGroups.push(group.slice(halfSize));
-            
-            return subGroups;
+            return [group]; // Should not reach here with max group size of 4
         }
 
         function findTeamForGroup(teams, group) {
-            // Find a team that can fit the entire group
-            for (let i = 0; i < teams.length; i++) {
-                const team = teams[i];
-                if (team.players.length + group.length <= team.targetSize) {
-                    return i;
-                }
-            }
-            return -1; // No team can fit the entire group
+            // Find teams that can fit the entire group without exceeding target size
+            const viableTeams = teams.filter(team => 
+                team.players.length + group.length <= team.targetSize
+            );
+            
+            if (viableTeams.length === 0) return -1;
+            
+            // Sort by current size (prefer smaller teams)
+            viableTeams.sort((a, b) => a.players.length - b.players.length);
+            
+            return teams.indexOf(viableTeams[0]);
         }
 
-        function findTeamForRequest(teams, player) {
-            // Try to honor requests first
+        function findTeamForPlayerWithRequests(teams, player, remainingPlayers) {
+            // First, try to find a team with requested players
             for (let i = 0; i < teams.length; i++) {
-                const team = teams[i];
-                if (team.players.length >= team.targetSize) continue;
+                if (teams[i].players.length >= teams[i].targetSize) continue;
                 
-                const hasRequestedPlayer = player.requests.some(reqName => 
-                    team.players.some(p => matchesName(p.name, reqName))
+                const hasRequestedPlayer = teams[i].players.some(teamPlayer =>
+                    player.requests.some(req => matchesName(teamPlayer.name, req))
                 );
                 
                 if (hasRequestedPlayer) {
@@ -780,8 +739,21 @@
                 }
             }
             
-            // Fallback to smallest team
+            // If no requested players are already placed, just find smallest team
             return findSmallestTeam(teams);
+        }
+
+        function calculateTeamSizes(totalPlayers, numTeams) {
+            const baseSize = Math.floor(totalPlayers / numTeams);
+            const extras = totalPlayers % numTeams;
+            const sizes = Array(numTeams).fill(baseSize);
+            
+            // Distribute extras to maintain max 1 player difference
+            for (let i = 0; i < extras; i++) {
+                sizes[i]++;
+            }
+            
+            return sizes;
         }
 
         function findSmallestTeam(teams) {
@@ -799,8 +771,6 @@
         }
 
         function addPlayerToTeam(team, player) {
-            if (team.players.length >= team.targetSize) return false;
-            
             team.players.push(player);
             
             if (player.position.toLowerCase().includes('keeper')) {
@@ -810,8 +780,10 @@
             if (player.isTR) {
                 team.teamReps++;
             }
-            
-            return true;
+        }
+
+        function matchesName(fullName, requestName) {
+            return fullName.toLowerCase().trim() === requestName.toLowerCase().trim();
         }
 
         function displayResults(teams) {
@@ -842,17 +814,22 @@
             
             // Calculate reciprocal groups honored
             const allPlayers = teams.flatMap(team => team.players);
-            const reciprocalGroups = findReciprocalPairs(allPlayers);
+            const reciprocalGroups = findReciprocalGroups(allPlayers);
             let groupsHonored = 0;
+            let groupsSplit = 0;
             
             reciprocalGroups.forEach(group => {
-                // Check if the entire group is on the same team
+                let fullyHonored = false;
                 teams.forEach(team => {
                     const teamPlayerNames = team.players.map(p => p.name);
                     if (group.every(player => teamPlayerNames.includes(player.name))) {
                         groupsHonored++;
+                        fullyHonored = true;
                     }
                 });
+                if (!fullyHonored && group.length > 2) {
+                    groupsSplit++;
+                }
             });
 
             document.getElementById('stats').innerHTML = `
@@ -871,89 +848,19 @@
                         <div class="stat-label">Size Difference</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-value">${teamsWithGoalkeepers}</div>
+                        <div class="stat-value">${teamsWithGoalkeepers}/${teams.length}</div>
                         <div class="stat-label">Teams with Goalkeepers</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-value">${teamsWithTRs}</div>
+                        <div class="stat-value">${teamsWithTRs}/${teams.length}</div>
                         <div class="stat-label">Teams with TRs</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-value">${groupsHonored}</div>
+                        <div class="stat-value">${groupsHonored}/${reciprocalGroups.length}</div>
                         <div class="stat-label">Reciprocal Groups Honored</div>
                     </div>
-                </div>
-            `;
-        }
-
-        function displayTeams(teams) {
-            document.getElementById('teamsDisplay').innerHTML = teams.map(team => {
-                const avgExp = team.players.length > 0 ? 
-                    (team.players.reduce((sum, p) => sum + p.experience, 0) / team.players.length).toFixed(1) : '0.0';
-                
-                return `
-                    <div class="team-card">
-                        <div class="team-header">
-                            ${team.name} (${team.players.length}/${team.targetSize})
-                            <br><small>Avg Experience: ${avgExp}</small>
-                        </div>
-                        <div class="team-content">
-                            <ul class="player-list">
-                                ${team.players.map(player => `
-                                    <li class="player-item">
-                                        <span class="player-name">${player.name}</span>
-                                        <span class="player-details">
-                                            Exp: ${player.experience} | ${player.position}
-                                            ${player.isTR ? ' | TR' : ''}
-                                            ${player.position.toLowerCase().includes('keeper') ? ' | GK' : ''}
-                                        </span>
-                                    </li>
-                                `).join('')}
-                            </ul>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // Download functionality
-        document.getElementById('downloadTeams').addEventListener('click', function() {
-            const csvData = [['Team', 'Player Name', 'Experience', 'Position', 'Missed Games', 'Team Rep', 'Player Requests']];
-            
-            generatedTeams.forEach(team => {
-                team.players.forEach(player => {
-                    const requestsText = player.requests && player.requests.length > 0 ? 
-                        player.requests.join(', ') : 'None';
-                    csvData.push([
-                        team.name,
-                        player.name,
-                        player.experience,
-                        player.position,
-                        player.missedGames,
-                        player.isTR ? 'Yes' : 'No',
-                        requestsText
-                    ]);
-                });
-            });
-
-            const csv = Papa.unparse(csvData);
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'teams.csv';
-            link.click();
-        });
-
-        function showError(message) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-        }
-
-        function hideError() {
-            document.getElementById('error').style.display = 'none';
-            document.getElementById('warnings').style.display = 'none';
-        }
-    </script>
-</body>
-</html>
+                    ${groupsSplit > 0 ? `
+                    <div class="stat-item">
+                        <div class="stat-value">${groupsSplit}</div>
+                        <div class="stat-label">Groups Split (3+)</div>
+                    </div>` : ''}
