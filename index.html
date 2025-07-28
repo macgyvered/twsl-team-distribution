@@ -370,22 +370,54 @@
                 dynamicTyping: true,
                 complete: function(results) {
                     try {
+                        debugLog('Raw CSV data rows:', results.data.length);
+                        
                         if (results.data.length < 2) {
-                            throw new Error('CSV must have at least 2 rows (headers and data)');
+                            throw new Error('CSV must have at least 2 rows');
                         }
                         
-                        const headers = results.data[1];
-                        const dataRows = results.data.slice(2);
+                        // Detect where headers are - look for row with "Full Name"
+                        let headerRowIndex = -1;
+                        for (let i = 0; i < Math.min(results.data.length, 5); i++) {
+                            if (results.data[i].some(cell => 
+                                cell && cell.toString().includes('Full Name')
+                            )) {
+                                headerRowIndex = i;
+                                break;
+                            }
+                        }
                         
-                        const objectData = dataRows.map(row => {
+                        if (headerRowIndex === -1) {
+                            throw new Error('Could not find header row with "Full Name" column');
+                        }
+                        
+                        debugLog('Found headers at row:', headerRowIndex);
+                        
+                        const headers = results.data[headerRowIndex];
+                        const dataRows = results.data.slice(headerRowIndex + 1);
+                        
+                        debugLog('Headers:', headers);
+                        debugLog('Data rows:', dataRows.length);
+                        
+                        // Convert to objects using headers
+                        const objectData = dataRows.map((row, index) => {
                             const obj = {};
-                            headers.forEach((header, index) => {
-                                if (header) {
-                                    obj[header] = row[index];
+                            headers.forEach((header, colIndex) => {
+                                if (header && typeof header === 'string') {
+                                    // Clean up header names
+                                    const cleanHeader = header.trim();
+                                    if (cleanHeader) {
+                                        obj[cleanHeader] = row[colIndex];
+                                    }
                                 }
                             });
                             return obj;
-                        });
+                        }).filter(obj => Object.keys(obj).length > 0); // Remove empty rows
+                        
+                        debugLog('Parsed player objects:', objectData.length);
+                        if (objectData.length > 0) {
+                            debugLog('Sample player:', objectData[0]);
+                        }
                         
                         processPlayerData(objectData);
                         populateDivisions();
@@ -393,33 +425,50 @@
                         hideError();
                     } catch (error) {
                         showError('Error processing CSV: ' + error.message);
+                        console.error('CSV Parse Error:', error);
                     }
+                },
+                error: function(error) {
+                    showError('Error reading CSV file: ' + error.message);
+                    console.error('CSV Read Error:', error);
                 }
             });
         }
 
         function processPlayerData(data) {
+            debugLog('Processing player data, input length:', data.length);
+            
             playerData = data.filter(row => {
-                return row['Full Name'] && 
-                       typeof row['Full Name'] === 'string' && 
-                       row['Full Name'].trim() !== '' &&
-                       !row['Full Name'].toLowerCase().includes('tally');
+                const hasName = row['Full Name'] && 
+                               typeof row['Full Name'] === 'string' && 
+                               row['Full Name'].trim() !== '' &&
+                               !row['Full Name'].toLowerCase().includes('tally');
+                return hasName;
             });
+            
+            debugLog('Filtered player count:', playerData.length);
 
             availableDivisions = [];
             const divisionColumns = ['Open Division', 'Over 30 Division', 'Over 40 Division'];
             
             divisionColumns.forEach(col => {
-                if (playerData.some(player => 
-                    player[col] === 'Yes' || player[col] === 'yes' || player[col] === true
-                )) {
+                const playersInDivision = playerData.filter(player => {
+                    const value = player[col];
+                    return value === 'Yes' || value === 'yes' || value === true || value === 1;
+                });
+                
+                if (playersInDivision.length > 0) {
                     availableDivisions.push(col);
+                    debugLog(`${col}: ${playersInDivision.length} players`);
                 }
             });
 
             if (availableDivisions.length === 0) {
-                throw new Error('No divisions found in the data');
+                debugLog('No divisions found. Sample player data:', playerData[0]);
+                throw new Error('No divisions found in the data. Please check that division columns contain "Yes" values.');
             }
+            
+            debugLog('Available divisions:', availableDivisions);
         }
 
         function populateDivisions() {
@@ -466,14 +515,19 @@
         }
 
         function getDivisionPlayers(division) {
-            return playerData.filter(player => 
-                player[division] === 'Yes' || player[division] === 'yes' || player[division] === true
-            ).map(player => ({
+            const divisionPlayers = playerData.filter(player => {
+                const value = player[division];
+                return value === 'Yes' || value === 'yes' || value === true || value === 1;
+            });
+            
+            debugLog(`Getting players for ${division}:`, divisionPlayers.length);
+            
+            return divisionPlayers.map(player => ({
                 name: player['Full Name'],
                 experience: parseFloat(player['Board Assigned Experience (1-3)']) || 1,
                 position: player['Position'] || 'Field Player',
                 missedGames: getMissedGamesValue(player['Missed Games']),
-                isTR: player['TR'] === 'Yes' || player['TR'] === 'yes' || player['TR'] === true,
+                isTR: player['TR'] === 'Yes' || player['TR'] === 'yes' || player['TR'] === true || player['TR'] === 1,
                 requests: getPlayerRequests(player, division)
             }));
         }
