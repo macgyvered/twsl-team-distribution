@@ -311,30 +311,12 @@
 
         function parseCSV(file) {
             Papa.parse(file, {
-                header: false, // Parse without headers first
+                header: true,
                 skipEmptyLines: true,
                 dynamicTyping: true,
                 complete: function(results) {
                     try {
-                        // Skip row 1 (tally row) and use row 2 as headers
-                        const data = results.data;
-                        if (data.length < 3) {
-                            throw new Error('CSV file must have at least 3 rows');
-                        }
-                        
-                        const headers = data[1]; // Row 2 contains headers (index 1)
-                        const dataRows = data.slice(2); // Data starts from row 3 (index 2+)
-                        
-                        // Convert to objects using headers
-                        const processedData = dataRows.map(row => {
-                            const obj = {};
-                            headers.forEach((header, index) => {
-                                obj[header] = row[index];
-                            });
-                            return obj;
-                        });
-                        
-                        processPlayerData(processedData);
+                        processPlayerData(results.data);
                         populateDivisions();
                         document.getElementById('generateTeams').disabled = false;
                         hideError();
@@ -666,23 +648,66 @@
         }
 
         function findReciprocalPairs(players) {
-            const pairs = [];
+            const groups = [];
             const used = new Set();
 
             players.forEach(player => {
                 if (used.has(player.name)) return;
 
-                for (const requestName of player.requests) {
-                    const requested = players.find(p => 
-                        !used.has(p.name) && matchesName(p.name, requestName)
-                    );
+                // Start a potential group with this player
+                const potentialGroup = [player];
+                const toCheck = [player];
+
+                // Recursively find all players who have mutual requests with the group
+                while (toCheck.length > 0) {
+                    const currentPlayer = toCheck.pop();
                     
-                    if (requested && requested.requests.some(name => matchesName(player.name, name))) {
-                        pairs.push([player, requested]);
-                        used.add(player.name);
-                        used.add(requested.name);
-                        break; // Only one pair per player
-                    }
+                    currentPlayer.requests.forEach(requestName => {
+                        const requestedPlayer = players.find(p => 
+                            !used.has(p.name) && 
+                            !potentialGroup.includes(p) &&
+                            matchesName(p.name, requestName)
+                        );
+                        
+                        if (requestedPlayer) {
+                            // Check if requested player also requests current player
+                            if (requestedPlayer.requests.some(name => matchesName(currentPlayer.name, name))) {
+                                // Also check if requested player requests ALL other members of the group
+                                const requestsAllMembers = potentialGroup.every(member => 
+                                    member === currentPlayer || 
+                                    requestedPlayer.requests.some(name => matchesName(member.name, name))
+                                );
+                                
+                                // And check if all current group members request the new player
+                                const allMembersRequestNew = potentialGroup.every(member =>
+                                    member === currentPlayer ||
+                                    member.requests.some(name => matchesName(requestedPlayer.name, name))
+                                );
+                                
+                                if (requestsAllMembers && allMembersRequestNew && potentialGroup.length < 4) {
+                                    potentialGroup.push(requestedPlayer);
+                                    toCheck.push(requestedPlayer);
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // If we found a reciprocal group (2 or more players), add it
+                if (potentialGroup.length >= 2) {
+                    groups.push(potentialGroup);
+                    potentialGroup.forEach(p => used.add(p.name));
+                }
+            });
+
+            // Convert groups to pairs format for compatibility with existing code
+            const pairs = [];
+            groups.forEach(group => {
+                if (group.length === 2) {
+                    pairs.push([group[0], group[1]]);
+                } else if (group.length >= 3) {
+                    // For groups of 3+, create a special "group" pair that contains all members
+                    pairs.push(group);
                 }
             });
 
@@ -816,22 +841,17 @@
             const teamsWithGoalkeepers = teams.filter(team => team.goalkeepers > 0).length;
             const teamsWithTRs = teams.filter(team => team.teamReps > 0).length;
             
-            // Calculate reciprocal pairs honored
+            // Calculate reciprocal groups honored
             const allPlayers = teams.flatMap(team => team.players);
-            const reciprocalPairs = findReciprocalPairs(allPlayers);
-            const pairedPlayers = new Set();
-            let pairsHonored = 0;
+            const reciprocalGroups = findReciprocalPairs(allPlayers);
+            let groupsHonored = 0;
             
-            reciprocalPairs.forEach(pair => {
-                pairedPlayers.add(pair[0].name);
-                pairedPlayers.add(pair[1].name);
-            });
-            
-            teams.forEach(team => {
-                const teamPlayerNames = team.players.map(p => p.name);
-                reciprocalPairs.forEach(pair => {
-                    if (teamPlayerNames.includes(pair[0].name) && teamPlayerNames.includes(pair[1].name)) {
-                        pairsHonored++;
+            reciprocalGroups.forEach(group => {
+                // Check if the entire group is on the same team
+                teams.forEach(team => {
+                    const teamPlayerNames = team.players.map(p => p.name);
+                    if (group.every(player => teamPlayerNames.includes(player.name))) {
+                        groupsHonored++;
                     }
                 });
             });
@@ -860,8 +880,8 @@
                         <div class="stat-label">Teams with TRs</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-value">${pairsHonored}</div>
-                        <div class="stat-label">Reciprocal Pairs Honored</div>
+                        <div class="stat-value">${groupsHonored}</div>
+                        <div class="stat-label">Reciprocal Groups Honored</div>
                     </div>
                 </div>
             `;
