@@ -13,9 +13,9 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
-            color: #2d3748;
+            color: #333;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
@@ -25,27 +25,22 @@
             max-width: 1200px;
             margin: 0 auto;
             background: white;
-            border-radius: 16px;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             overflow: hidden;
         }
 
         .header {
-            background: linear-gradient(135deg, #2d3748 0%, #4299e1 100%);
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
             color: white;
-            padding: 40px;
+            padding: 30px;
             text-align: center;
         }
 
         .header h1 {
             font-size: 2.5rem;
             margin-bottom: 10px;
-            font-weight: 600;
-        }
-
-        .header p {
-            font-size: 1.1rem;
-            opacity: 0.9;
+            font-weight: 300;
         }
 
         .main-content {
@@ -53,18 +48,12 @@
         }
 
         .upload-section {
-            background: #f7fafc;
-            border-radius: 12px;
+            background: #f8f9fa;
+            border-radius: 10px;
             padding: 30px;
             margin-bottom: 30px;
-            border: 2px dashed #cbd5e0;
+            border: 2px dashed #dee2e6;
             text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        .upload-section.dragover {
-            border-color: #4299e1;
-            background: #ebf8ff;
         }
 
         .file-input {
@@ -73,148 +62,109 @@
 
         .file-label {
             display: inline-block;
-            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            background: #3498db;
             color: white;
-            padding: 15px 30px;
+            padding: 12px 24px;
             border-radius: 8px;
             cursor: pointer;
             font-size: 1.1rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            border: none;
+            transition: background 0.3s ease;
         }
 
         .file-label:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(66, 153, 225, 0.3);
-        }
-
-        .file-info {
-            margin-top: 15px;
-            color: #4a5568;
-            font-size: 1rem;
+            background: #2980b9;
         }
 
         .controls {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 25px;
+            gap: 20px;
             margin-bottom: 30px;
         }
 
         .control-group {
-            background: #f7fafc;
-            padding: 25px;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
         }
 
         .control-group label {
             display: block;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             font-weight: 600;
-            color: #2d3748;
-            font-size: 1rem;
+            color: #2c3e50;
         }
 
         .control-group select,
         .control-group input {
             width: 100%;
-            padding: 12px 16px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
             font-size: 1rem;
-            transition: border-color 0.3s ease;
-            background: white;
-        }
-
-        .control-group select:focus,
-        .control-group input:focus {
-            outline: none;
-            border-color: #4299e1;
-            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
         }
 
         .generate-btn {
-            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
             color: white;
             border: none;
-            padding: 18px 36px;
+            padding: 15px 30px;
             font-size: 1.2rem;
-            font-weight: 600;
-            border-radius: 10px;
+            border-radius: 8px;
             cursor: pointer;
             width: 100%;
             margin-bottom: 30px;
-            transition: all 0.3s ease;
-        }
-
-        .generate-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(72, 187, 120, 0.3);
         }
 
         .generate-btn:disabled {
-            background: #a0aec0;
+            background: #bdc3c7;
             cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
         }
 
         .results {
             display: none;
-            animation: fadeIn 0.5s ease-in;
         }
 
         .results.show {
             display: block;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
         .stats {
-            background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
-            border: 1px solid #9ae6b4;
-            border-radius: 12px;
-            padding: 25px;
+            background: #e8f5e8;
+            border: 1px solid #27ae60;
+            border-radius: 10px;
+            padding: 20px;
             margin-bottom: 30px;
         }
 
         .stats h3 {
-            color: #22543d;
-            margin-bottom: 20px;
-            font-size: 1.4rem;
-            font-weight: 600;
+            color: #27ae60;
+            margin-bottom: 15px;
         }
 
         .stat-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 15px;
         }
 
         .stat-item {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
+            padding: 15px;
+            border-radius: 8px;
             text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
         .stat-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #2d3748;
-            margin-bottom: 8px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
         }
 
         .stat-label {
-            color: #718096;
+            color: #7f8c8d;
             font-size: 0.9rem;
-            font-weight: 500;
         }
 
         .teams-grid {
@@ -226,24 +176,22 @@
 
         .team-card {
             background: white;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
             overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            width: 100%;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
         .team-header {
-            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            background: #3498db;
             color: white;
-            padding: 20px;
-            font-weight: 600;
+            padding: 15px;
+            font-weight: bold;
             text-align: center;
-            font-size: 1.2rem;
         }
 
         .team-content {
-            padding: 20px;
+            padding: 15px;
         }
 
         .player-list {
@@ -251,8 +199,8 @@
         }
 
         .player-item {
-            padding: 12px 0;
-            border-bottom: 1px solid #f7fafc;
+            padding: 8px 0;
+            border-bottom: 1px solid #f8f9fa;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -264,69 +212,36 @@
 
         .player-name {
             font-weight: 500;
-            color: #2d3748;
         }
 
         .player-details {
             font-size: 0.85rem;
-            color: #718096;
-        }
-
-        .player-name {
-            font-weight: 500;
-            color: #2d3748;
-        }
-
-        .player-details {
-            font-size: 0.85rem;
-            color: #718096;
+            color: #6c757d;
         }
 
         .download-btn {
-            background: linear-gradient(135deg, #805ad5 0%, #6b46c1 100%);
+            background: #9b59b6;
             color: white;
             border: none;
-            padding: 15px 30px;
-            border-radius: 8px;
+            padding: 12px 24px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 1rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
         }
 
-        .download-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(128, 90, 213, 0.3);
-        }
-
-        .alert {
-            padding: 16px 20px;
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
             border-radius: 8px;
             margin-bottom: 20px;
-            font-weight: 500;
-        }
-
-        .alert-error {
-            background: #fed7d7;
-            color: #9b2c2c;
-            border: 1px solid #feb2b2;
-        }
-
-        .alert-warning {
-            background: #fefcbf;
-            color: #975a16;
-            border: 1px solid #f6e05e;
-        }
-
-        .alert-success {
-            background: #c6f6d5;
-            color: #22543d;
-            border: 1px solid #9ae6b4;
+            border: 1px solid #f5c6cb;
+            display: none;
         }
 
         .debug-section {
-            background: #f7fafc;
-            border: 1px solid #e2e8f0;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
@@ -339,53 +254,27 @@
 
         .debug-section h4 {
             margin-bottom: 10px;
-            color: #4a5568;
-            font-weight: 600;
+            color: #555;
         }
 
         .debug-content {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.85rem;
+            font-family: monospace;
+            font-size: 0.9rem;
             white-space: pre-wrap;
             background: white;
-            padding: 15px;
-            border-radius: 6px;
+            padding: 10px;
+            border-radius: 4px;
             max-height: 300px;
             overflow-y: auto;
-            border: 1px solid #e2e8f0;
         }
 
         @media (max-width: 768px) {
-            .main-content {
-                padding: 20px;
-            }
-            
             .controls {
                 grid-template-columns: 1fr;
             }
-            
             .teams-grid {
                 flex-direction: column;
             }
-            
-            .stat-grid {
-                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            }
-        }
-
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-            margin-right: 10px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -397,10 +286,10 @@
         </div>
         
         <div class="main-content">
-            <div class="upload-section" id="uploadSection">
+            <div class="upload-section">
                 <input type="file" id="csvFile" class="file-input" accept=".csv" />
                 <label for="csvFile" class="file-label">📄 Upload Player CSV</label>
-                <div id="fileInfo" class="file-info">Select a CSV file to get started</div>
+                <p id="fileInfo" style="margin-top: 10px; color: #6c757d;"></p>
             </div>
 
             <div class="controls">
@@ -416,11 +305,14 @@
                 </div>
             </div>
 
-            <button id="generateTeams" class="generate-btn" disabled>
-                Generate Teams
-            </button>
+            <button id="generateTeams" class="generate-btn" disabled>Generate Teams</button>
 
-            <div id="alerts"></div>
+            <div id="error" class="error"></div>
+
+            <div id="warnings" class="error" style="background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; display: none;">
+                <h4>⚠️ Warnings</h4>
+                <ul id="warningsList"></ul>
+            </div>
 
             <div id="debug" class="debug-section">
                 <h4>🔍 Debug Information</h4>
@@ -438,195 +330,111 @@
     </div>
 
     <script>
-        // Global variables
         let playerData = [];
         let availableDivisions = [];
         let generatedTeams = [];
-        const debugMode = true;
+        let debugMode = true; // Enable debug logging
 
-        // Wait for DOM to be ready
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, initializing app...');
-            initializeApp();
+        // Debug logging function
+        function debugLog(message, data = null) {
+            if (!debugMode) return;
+            
+            const debugContent = document.getElementById('debugContent');
+            const debugSection = document.getElementById('debug');
+            debugSection.classList.add('show');
+            
+            const timestamp = new Date().toLocaleTimeString();
+            let logMessage = `[${timestamp}] ${message}`;
+            
+            if (data !== null) {
+                logMessage += '\n' + JSON.stringify(data, null, 2);
+            }
+            
+            debugContent.textContent += logMessage + '\n\n';
+            console.log(message, data);
+        }
+
+        // File upload
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('fileInfo').textContent = `Selected: ${file.name}`;
+                parseCSV(file);
+            }
         });
 
-        function initializeApp() {
-            try {
-                // Check if Papa Parse is loaded
-                if (typeof Papa === 'undefined') {
-                    showAlert('PapaParse library failed to load. Please refresh the page.', 'error');
-                    return;
+        function parseCSV(file) {
+            Papa.parse(file, {
+                header: true,  // Parse first row as headers
+                skipEmptyLines: true,
+                dynamicTyping: true,
+                delimitersToGuess: [',', '\t', '|', ';'],
+                complete: function(results) {
+                    try {
+                        debugLog('CSV parsed successfully');
+                        debugLog('Number of rows:', results.data.length);
+                        debugLog('Headers:', results.meta.fields);
+                        
+                        if (results.data.length === 0) {
+                            throw new Error('No data rows found in CSV');
+                        }
+                        
+                        // Log sample data
+                        if (results.data.length > 0) {
+                            debugLog('First player data:', results.data[0]);
+                        }
+                        
+                        processPlayerData(results.data);
+                        populateDivisions();
+                        document.getElementById('generateTeams').disabled = false;
+                        hideError();
+                        document.getElementById('fileInfo').textContent = `✓ Loaded ${playerData.length} players`;
+                    } catch (error) {
+                        showError('Error processing CSV: ' + error.message);
+                        console.error('CSV Parse Error:', error);
+                    }
+                },
+                error: function(error) {
+                    showError('Error reading CSV file: ' + error.message);
+                    console.error('CSV Read Error:', error);
                 }
-
-                debugLog('App initialized successfully');
-                
-                // Set up event listeners
-                setupEventListeners();
-                
-                showAlert('Ready to upload CSV file', 'success');
-            } catch (error) {
-                console.error('Initialization error:', error);
-                showAlert('Failed to initialize app: ' + error.message, 'error');
-            }
-        }
-
-        function setupEventListeners() {
-            const fileInput = document.getElementById('csvFile');
-            const generateBtn = document.getElementById('generateTeams');
-            const downloadBtn = document.getElementById('downloadTeams');
-            const uploadSection = document.getElementById('uploadSection');
-
-            // File upload
-            fileInput.addEventListener('change', handleFileUpload);
-            
-            // Drag and drop
-            uploadSection.addEventListener('dragover', handleDragOver);
-            uploadSection.addEventListener('dragleave', handleDragLeave);
-            uploadSection.addEventListener('drop', handleDrop);
-            
-            // Generate teams
-            generateBtn.addEventListener('click', generateTeams);
-            
-            // Download teams
-            downloadBtn.addEventListener('click', downloadTeams);
-        }
-
-        function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (file) {
-                processFile(file);
-            }
-        }
-
-        function handleDragOver(event) {
-            event.preventDefault();
-            event.currentTarget.classList.add('dragover');
-        }
-
-        function handleDragLeave(event) {
-            event.currentTarget.classList.remove('dragover');
-        }
-
-        function handleDrop(event) {
-            event.preventDefault();
-            event.currentTarget.classList.remove('dragover');
-            
-            const file = event.dataTransfer.files[0];
-            if (file && file.type === 'text/csv') {
-                document.getElementById('csvFile').files = event.dataTransfer.files;
-                processFile(file);
-            } else {
-                showAlert('Please drop a CSV file', 'error');
-            }
-        }
-
-        function processFile(file) {
-            try {
-                debugLog('Processing file:', file.name);
-                document.getElementById('fileInfo').innerHTML = `<span class="loading"></span>Processing: ${file.name}`;
-                
-                Papa.parse(file, {
-                    header: true,
-                    skipEmptyLines: true,
-                    dynamicTyping: true,
-                    delimitersToGuess: [',', '\t', '|', ';'],
-                    complete: handleParseComplete,
-                    error: handleParseError
-                });
-            } catch (error) {
-                console.error('File processing error:', error);
-                showAlert('Error processing file: ' + error.message, 'error');
-            }
-        }
-
-        function handleParseComplete(results) {
-            try {
-                debugLog('CSV parsed successfully');
-                debugLog('Number of rows:', results.data.length);
-                debugLog('Headers:', results.meta.fields);
-                
-                if (results.errors && results.errors.length > 0) {
-                    debugLog('Parse warnings:', results.errors);
-                }
-                
-                if (results.data.length === 0) {
-                    throw new Error('No data rows found in CSV');
-                }
-                
-                // Log sample data
-                if (results.data.length > 0) {
-                    debugLog('First player data:', results.data[0]);
-                }
-                
-                processPlayerData(results.data);
-                populateDivisions();
-                
-                document.getElementById('generateTeams').disabled = false;
-                clearAlerts();
-                document.getElementById('fileInfo').innerHTML = `✅ Loaded ${playerData.length} players from ${availableDivisions.length} divisions`;
-                
-                showAlert(`Successfully loaded ${playerData.length} players`, 'success');
-                
-            } catch (error) {
-                console.error('Parse completion error:', error);
-                showAlert('Error processing CSV: ' + error.message, 'error');
-                document.getElementById('fileInfo').innerHTML = '❌ Failed to process file';
-            }
-        }
-
-        function handleParseError(error) {
-            console.error('CSV Parse Error:', error);
-            showAlert('Error reading CSV file: ' + error.message, 'error');
-            document.getElementById('fileInfo').innerHTML = '❌ Failed to read file';
+            });
         }
 
         function processPlayerData(data) {
-            try {
-                debugLog('Processing player data, input length:', data.length);
-                
-                // Filter valid players
-                playerData = data.filter(row => {
-                    const hasName = row['Full Name'] && 
-                                   typeof row['Full Name'] === 'string' && 
-                                   row['Full Name'].trim() !== '' &&
-                                   !row['Full Name'].toLowerCase().includes('tally');
-                    
-                    if (!hasName && row['Full Name']) {
-                        debugLog('Filtered out player:', row['Full Name']);
-                    }
-                    
-                    return hasName;
+            debugLog('Processing player data, input length:', data.length);
+            
+            playerData = data.filter(row => {
+                const hasName = row['Full Name'] && 
+                               typeof row['Full Name'] === 'string' && 
+                               row['Full Name'].trim() !== '' &&
+                               !row['Full Name'].toLowerCase().includes('tally');
+                return hasName;
+            });
+            
+            debugLog('Filtered player count:', playerData.length);
+
+            availableDivisions = [];
+            const divisionColumns = ['Open Division', 'Over 30 Division', 'Over 40 Division'];
+            
+            divisionColumns.forEach(col => {
+                const playersInDivision = playerData.filter(player => {
+                    const value = player[col];
+                    return value === 'Yes' || value === 'yes' || value === true || value === 1;
                 });
                 
-                debugLog('Filtered player count:', playerData.length);
-
-                // Find available divisions
-                availableDivisions = [];
-                const divisionColumns = ['Open Division', 'Over 30 Division', 'Over 40 Division'];
-                
-                divisionColumns.forEach(col => {
-                    const playersInDivision = playerData.filter(player => {
-                        const value = player[col];
-                        return value === 'Yes' || value === 'yes' || value === true || value === 1;
-                    });
-                    
-                    if (playersInDivision.length > 0) {
-                        availableDivisions.push(col);
-                        debugLog(`${col}: ${playersInDivision.length} players`);
-                    }
-                });
-
-                if (availableDivisions.length === 0) {
-                    debugLog('No divisions found. Sample player data:', playerData[0]);
-                    throw new Error('No divisions found in the data. Please check that division columns contain "Yes" values.');
+                if (playersInDivision.length > 0) {
+                    availableDivisions.push(col);
+                    debugLog(`${col}: ${playersInDivision.length} players`);
                 }
-                
-                debugLog('Available divisions:', availableDivisions);
-                
-            } catch (error) {
-                console.error('Player data processing error:', error);
-                throw error;
+            });
+
+            if (availableDivisions.length === 0) {
+                debugLog('No divisions found. Sample player data:', playerData[0]);
+                throw new Error('No divisions found in the data. Please check that division columns contain "Yes" values.');
             }
+            
+            debugLog('Available divisions:', availableDivisions);
         }
 
         function populateDivisions() {
@@ -641,60 +449,34 @@
             });
         }
 
-        function generateTeams() {
-            try {
-                const division = document.getElementById('division').value;
-                const teamCount = parseInt(document.getElementById('teamCount').value);
+        // Team generation
+        document.getElementById('generateTeams').addEventListener('click', generateTeams);
 
-                if (!division || !teamCount) {
-                    showAlert('Please select a division and number of teams', 'error');
-                    return;
+        function generateTeams() {
+            const division = document.getElementById('division').value;
+            const teamCount = parseInt(document.getElementById('teamCount').value);
+
+            if (!division || !teamCount) {
+                showError('Please select a division and number of teams');
+                return;
+            }
+
+            // Clear debug log
+            document.getElementById('debugContent').textContent = '';
+            
+            try {
+                const divisionPlayers = getDivisionPlayers(division);
+                if (divisionPlayers.length === 0) {
+                    throw new Error('No players found for selected division');
                 }
 
-                debugLog('Generating teams for:', division, 'with', teamCount, 'teams');
+                const teams = balanceTeams(divisionPlayers, teamCount);
+                generatedTeams = teams;
                 
-                // Show loading state
-                const btn = document.getElementById('generateTeams');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<span class="loading"></span>Generating Teams...';
-                btn.disabled = true;
-
-                // Clear previous results
-                clearAlerts();
-                document.getElementById('debugContent').textContent = '';
-                
-                setTimeout(() => {
-                    try {
-                        const divisionPlayers = getDivisionPlayers(division);
-                        if (divisionPlayers.length === 0) {
-                            throw new Error('No players found for selected division');
-                        }
-
-                        if (divisionPlayers.length < teamCount) {
-                            showAlert(`Warning: Only ${divisionPlayers.length} players available for ${teamCount} teams`, 'warning');
-                        }
-
-                        const teams = balanceTeams(divisionPlayers, teamCount);
-                        generatedTeams = teams;
-                        
-                        displayResults(teams);
-                        document.getElementById('results').classList.add('show');
-                        
-                        showAlert('Teams generated successfully!', 'success');
-                        
-                    } catch (error) {
-                        console.error('Team generation error:', error);
-                        showAlert('Error generating teams: ' + error.message, 'error');
-                    } finally {
-                        // Reset button
-                        btn.innerHTML = originalText;
-                        btn.disabled = false;
-                    }
-                }, 100);
-                
+                displayResults(teams);
+                document.getElementById('results').classList.add('show');
             } catch (error) {
-                console.error('Generate teams error:', error);
-                showAlert('Error: ' + error.message, 'error');
+                showError('Error generating teams: ' + error.message);
             }
         }
 
@@ -749,8 +531,6 @@
 
         function balanceTeams(players, teamCount) {
             const warnings = [];
-            
-            debugLog(`Balancing ${players.length} players into ${teamCount} teams`);
             
             // Calculate target team sizes
             const targetSizes = calculateTeamSizes(players.length, teamCount);
@@ -912,7 +692,6 @@
             });
 
             teams.warnings = warnings;
-            debugLog('Team balancing complete');
             return teams;
         }
 
@@ -986,6 +765,8 @@
 
             return groups;
         }
+
+        function findReciprocalGroups(players) {
             const groups = [];
             const used = new Set();
 
@@ -1039,6 +820,8 @@
             if (group.length <= 2) return [group];
             
             if (group.length === 3) {
+                // For group of 3, try to keep 2 together
+                // Could implement logic to choose which 2 based on other factors
                 return [
                     [group[0], group[1]],
                     [group[2]]
@@ -1046,23 +829,27 @@
             }
             
             if (group.length === 4) {
+                // Split into two pairs
                 return [
                     [group[0], group[1]],
                     [group[2], group[3]]
                 ];
             }
             
-            return [group];
+            return [group]; // Should not reach here with max group size of 4
         }
 
         function findTeamForGroup(teams, group) {
+            // Find teams that can fit the entire group without exceeding target size
             const viableTeams = teams.filter(team => 
                 team.players.length + group.length <= team.targetSize
             );
             
             if (viableTeams.length === 0) return -1;
             
+            // Sort by current size (prefer smaller teams)
             viableTeams.sort((a, b) => a.players.length - b.players.length);
+            
             return teams.indexOf(viableTeams[0]);
         }
 
@@ -1112,6 +899,7 @@
             const extras = totalPlayers % numTeams;
             const sizes = Array(numTeams).fill(baseSize);
             
+            // Distribute extras to maintain max 1 player difference
             for (let i = 0; i < extras; i++) {
                 sizes[i]++;
             }
@@ -1156,9 +944,14 @@
         }
 
         function displayWarnings(warnings) {
+            const warningsDiv = document.getElementById('warnings');
+            const warningsList = document.getElementById('warningsList');
+            
             if (warnings.length > 0) {
-                const warningsHtml = warnings.map(warning => `<li>${warning}</li>`).join('');
-                showAlert(`<strong>Warnings:</strong><ul style="margin-left: 20px; margin-top: 10px;">${warningsHtml}</ul>`, 'warning');
+                warningsList.innerHTML = warnings.map(warning => `<li>${warning}</li>`).join('');
+                warningsDiv.style.display = 'block';
+            } else {
+                warningsDiv.style.display = 'none';
             }
         }
 
@@ -1259,31 +1052,27 @@
             document.getElementById('teamsDisplay').innerHTML = teamsHtml;
         }
 
+        // Download functionality
+        document.getElementById('downloadTeams').addEventListener('click', downloadTeams);
+
         function downloadTeams() {
             if (generatedTeams.length === 0) {
-                showAlert('No teams to download', 'error');
+                showError('No teams to download');
                 return;
             }
 
-            try {
-                const csvContent = generateTeamsCSV(generatedTeams);
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement('a');
-                
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', 'team_assignments.csv');
-                link.style.visibility = 'hidden';
-                
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                showAlert('Teams CSV downloaded successfully', 'success');
-            } catch (error) {
-                console.error('Download error:', error);
-                showAlert('Error downloading teams: ' + error.message, 'error');
-            }
+            const csvContent = generateTeamsCSV(generatedTeams);
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'team_assignments.csv');
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         function generateTeamsCSV(teams) {
@@ -1307,45 +1096,14 @@
             ).join('\n');
         }
 
-        // Utility functions
-        function debugLog(message, data = null) {
-            if (!debugMode) return;
-            
-            const debugContent = document.getElementById('debugContent');
-            const debugSection = document.getElementById('debug');
-            debugSection.classList.add('show');
-            
-            const timestamp = new Date().toLocaleTimeString();
-            let logMessage = `[${timestamp}] ${message}`;
-            
-            if (data !== null) {
-                logMessage += '\n' + JSON.stringify(data, null, 2);
-            }
-            
-            debugContent.textContent += logMessage + '\n\n';
-            console.log(message, data);
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
         }
 
-        function showAlert(message, type = 'info') {
-            const alertsContainer = document.getElementById('alerts');
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${type}`;
-            alertDiv.innerHTML = message;
-            
-            alertsContainer.appendChild(alertDiv);
-            
-            // Auto-remove success alerts after 5 seconds
-            if (type === 'success') {
-                setTimeout(() => {
-                    if (alertDiv.parentNode) {
-                        alertDiv.parentNode.removeChild(alertDiv);
-                    }
-                }, 5000);
-            }
-        }
-
-        function clearAlerts() {
-            document.getElementById('alerts').innerHTML = '';
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
         }
     </script>
 </body>
