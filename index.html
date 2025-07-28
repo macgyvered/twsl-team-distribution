@@ -724,18 +724,8 @@
         }
 
         function matchesName(fullName, requestName) {
-            const full = fullName.toLowerCase().trim();
-            const request = requestName.toLowerCase().trim();
-            
-            if (full === request) return true;
-            
-            const firstName = full.split(' ')[0];
-            const lastName = full.split(' ').pop();
-            
-            if (firstName === request) return true;
-            if (lastName === request && lastName.length > 2) return true;
-            
-            return full.includes(request) || request.includes(firstName);
+            // Exact match only to avoid confusion with similar names
+            return fullName.toLowerCase().trim() === requestName.toLowerCase().trim();
         }
 
         function findBestTeamForPair(teams, pair) {
@@ -928,17 +918,20 @@
 
         // Download functionality
         document.getElementById('downloadTeams').addEventListener('click', function() {
-            const csvData = [['Team', 'Player Name', 'Experience', 'Position', 'Missed Games', 'Team Rep']];
+            const csvData = [['Team', 'Player Name', 'Experience', 'Position', 'Missed Games', 'Team Rep', 'Player Requests']];
             
             generatedTeams.forEach(team => {
                 team.players.forEach(player => {
+                    const requestsText = player.requests && player.requests.length > 0 ? 
+                        player.requests.join(', ') : 'None';
                     csvData.push([
                         team.name,
                         player.name,
                         player.experience,
                         player.position,
                         player.missedGames,
-                        player.isTR ? 'Yes' : 'No'
+                        player.isTR ? 'Yes' : 'No',
+                        requestsText
                     ]);
                 });
             });
